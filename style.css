@@ -1,0 +1,18 @@
+
+.disasm {
+	font-family: monospace;
+}
+
+.op-addr {
+	color: #888888;
+	width: 8em;
+}
+
+.op-name {
+	color: #000080;
+	width: 4em;
+}
+
+.op-signature {
+	color: #555577;
+}

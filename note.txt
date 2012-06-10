@@ -1,0 +1,176 @@
+
+sprites in banks: 0x0C -- 0x13
+
+1:6341 - data (pointers)
+
+select * from calls where not exists (select * from procs where procs.addr=calls.source) and calls.source != "FFFF:0000"
+select * from procs where not exists (select * from calls where procs.addr=calls.destination)
+select * from procs where has_suspicious_instr=1
+
+0000:0B53:
+	bank remember/restore
+
+0002:529A:
+	empty if
+
+refactor:
+	disasm(addr) -> instr, next_addr
+
+	instr.is_terminal() -- no continuation at next_addr. also useful in restructured code
+
+	remove calls() from Instruction. Call instruction will have something special
+
+	operands() -- maybe just for BaseOp, etc. No use in general
+
+	addr -- useful.
+	opcodes -- unneeded. can be obtained easily.
+	cycles -- needed. however, could be part of opcodeeffect, using pseudoregister
+
+
+
+dfs:
+- start point
+- limit (next proc addr) any jump beyond that is a tailcall/etc.
+- calls could probably move the limit backwards
+- dfs everything within limit. could still be large.
+- jump tables are expanded last (separate queue)
+- isLocalAddr(addr)
+- detect conflicts with jumptable space... and also overlapping instructions etc. report that
+- return: set of reachable addresses within limit, jump table sizes
+
+next pass:
+- set limit to first gap.
+- compute label set
+- remember jump table sizes (or just use next label...)
+- now disassembly possible
+
+graph construction:
+- make ordered list of basic blocks (started by labels or entry point)
+- make dict: addr -> block_id
+- add basic blocks, removing jump instructions
+	- replace with mapping: block_id -> ordered list of exits
+	- for far jumps add pseudo blocks (or replace with tail-call)
+		- possibility: merge same tail calls into one block...
+- return: list of basic blocks, dict of jumps between them
+
+early optimization:
+- traverse graph, optimize with context.
+
+
+
+
+
+
+
+- procedures -- always continuous and in single bank
+- is-current -- all subprocs must be current too
+- switches -- auto limit till next code section, nice if can get continuous proc
+
+- proc dfs -> basic blocks ([blocks], dict(id -> [exits]), dict(id -> [entries]), last instruction in block constructs if/switch/loop. maybe special new instruction)
+
+Persistent DB:
+
+	procs: {start-addr, type(proc, snippet), depset, has-switch, has-ambig, is-current, is-fragmented}
+	calls: {caller-addr, callee-addr, instr-addr}
+	names: {addr, name}
+
+
+
+BANKS:
+00 MAIN CODE
+01 MAIN CODE
+02 some logic code
+03 code with some data
+04 unknown stuff
+05 code and data (stuff at top)
+06 code and data (stuff at top)
+07 unknown stuff
+08 DATA
+09 stuff then text from 2700
+0A unknown stuff
+0B unknown stuff
+0C SPRITES
+0D SPRITES
+0E SPRITES
+0F SPRITES
+10 SPRITES
+11 SPRITES
+12 SPRITES
+13 SPRITES
+14 unknown code
+15 unknown stuff, some code
+16 stuff, then text from 1700
+17 some scroll code, credits text, logic
+18 data, code
+19 stuff and empty space
+1A stuff and empty space
+1B MUSIC
+1C map? and text from 0A00
+1D TEXT
+1E MUSIC
+1F MUSIC
+
+DB54 -- current area location
+DB9A -- start menu scroll (0 - in menu, 80 - hidden) (desired_WY)
+start menu doesn't change mode_1 or mode_2
+DBA6 -- player select cursor location
+
+sprite 2-3 -- Link
+sprite 4-5 -- sword
+
+Screen warp modes:
+mode_1 -- DB95
+mode_2 -- DB96
+
+mode_1 == 0:
+	intro.
+	mode_2 >= 8:
+		do logo warp
+
+	mode_2 == B:
+		logo screen
+
+mode_1 == 2:
+	player select
+
+	mode_2 == 7 -- idle
+
+mode_1 == 3:
+	new player
+	mode_2 == 2 -- idle
+
+mode_1 == 4:
+	erase screen
+
+mode_1 == 5:
+	copy screen
+
+	mode_2 == 4 -- select source
+	mode_2 == 5 -- select destination
+
+mode_1 == 7:
+	map view.
+	mode_2 == 4:
+		idle
+
+	mode_2 == 5:
+		return to game
+
+mode_1 == B:
+	normal game mode
+
+	game over screen doesn't change it
+
+	mode_2 < 7 -- animation when entering
+	mode_2 == 7 -- idle
+
+
+
+Giant switch opcode -- FFEB
+obj alive status -- FFEA
+	0 -- off
+	5 -- normal
+
+6E -- butterfly
+1C -- small zol
+19 -- keese
