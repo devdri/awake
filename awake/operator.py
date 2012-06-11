@@ -96,6 +96,9 @@ class Add(BinOp):
         if isConstant(b) and b.getValue() == 0:
             return a
 
+        if a == b:
+            return Shl(a, operand.Constant(1)).optimizedWithContext(ctx)
+
         return BinOp.optimizedWithContext(self, ctx)
 
 class Sub(BinOp):
@@ -115,11 +118,15 @@ class And(BinOp):
     def optimizedWithContext(self, ctx):
         if self.left == self.right:
             return self.left.optimizedWithContext(ctx)
-        if isinstance(self.left, And):
-            return And(self.left.left, And(self.left.right, self.right)).optimizedWithContext(ctx)
 
         if isConstant(self.right) and self.left.getValueMask() == self.right.getValue():
-            return self.left
+            return self.left.optimizedWithContext(ctx)
+
+        if isConstant(self.right) and self.right.getValue() == 0:
+            return self.right
+
+        if isinstance(self.left, And):
+            return And(self.left.left, And(self.left.right, self.right)).optimizedWithContext(ctx)
 
         return BinOp.optimizedWithContext(self, ctx)
 
@@ -154,7 +161,7 @@ class Equals(BinOp):
         super(Equals, self).__init__('==', a, b)
 
     def calculate(self, left, right):
-        return left == right
+        return int(left == right)
 
     def logicalNot(self):
         return NotEquals(self.left, self.right)
@@ -164,7 +171,7 @@ class NotEquals(BinOp):
         super(NotEquals, self).__init__('!=', a, b)
 
     def calculate(self, left, right):
-        return left != right
+        return int(left != right)
 
     def logicalNot(self):
         return Equals(self.left, self.right)
@@ -217,14 +224,14 @@ class Shl(BinOp):
             sum_shift = sh_b - sh_a
 
             if sum_shift < 0:
-                return And(Shr(left.left, operand.Constant(-sum_shift)), mask)
+                return And(Shr(left.left, operand.Constant(-sum_shift)), mask).optimizedWithContext(ctx)
             else:
-                return And(Shl(left.left, operand.Constant(sum_shift)), mask)
+                return And(Shl(left.left, operand.Constant(sum_shift)), mask).optimizedWithContext(ctx)
 
         if isinstance(left, And):
             a = left.left
             b = left.right
-            return And(Shl(a, right), Shl(b, right))
+            return And(Shl(a, right), Shl(b, right)).optimizedWithContext(ctx)
 
         return Shl(left, right)
 
@@ -263,14 +270,14 @@ class Shr(BinOp):
             sum_shift = sh_b - sh_a
 
             if sum_shift < 0:
-                return And(Shl(left.left, operand.Constant(-sum_shift)), mask)
+                return And(Shl(left.left, operand.Constant(-sum_shift)), mask).optimizedWithContext(ctx)
             else:
-                return And(Shr(left.left, operand.Constant(sum_shift)), mask)
+                return And(Shr(left.left, operand.Constant(sum_shift)), mask).optimizedWithContext(ctx)
 
         if isinstance(left, And):
             a = left.left
             b = left.right
-            return And(Shr(a, right), Shr(b, right))
+            return And(Shr(a, right), Shr(b, right)).optimizedWithContext(ctx)
 
         return Shr(left, right)
 
