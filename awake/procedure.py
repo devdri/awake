@@ -303,7 +303,7 @@ class ProcedureGraph(object):
 
         if last.name == 'JP':
             childs += last.allJumps()
-            if last.cond.alwaysTrue():
+            if last.cond.alwaysTrue() and last.allJumps():
                 remove_last = True
         elif last.name == 'switch':
             childs += last.jumpsForSize(self.jumptable_sizes[addr])  # TODO: XXX: addr is not nice here
