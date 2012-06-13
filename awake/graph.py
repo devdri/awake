@@ -130,14 +130,6 @@ def getSubgraph(start_points):
 def search():
     """
     input = [
-address.fromConventional("0003:557E"),
-address.fromConventional("0003:4D90"),
-address.fromConventional("0003:4D26"),
-address.fromConventional("0003:490A"),
-address.fromConventional("0003:4EBC"),
-address.fromConventional("0003:5792"),
-address.fromConventional("0003:4E49"),
-#address.fromConventional("0003:45CD"),
 address.fromConventional("0003:6A4B"),
 address.fromConventional("0019:4461"),
 address.fromConventional("0003:66BF"),
@@ -343,9 +335,9 @@ address.fromConventional("0015:44BD"),
 address.fromConventional("0019:6B97"),
 address.fromConventional("0018:4957"),
 address.fromConventional("0019:6E13"),
-#address.fromConventional("0018:5132"),
-#address.fromConventional("0018:5180"),
-#address.fromConventional("0018:525D"),
+#address.fromConventional("0018:5132"), #
+#address.fromConventional("0018:5180"), # cannot be included until 0018:5168 problems resolved
+#address.fromConventional("0018:525D"), #
 address.fromConventional("0018:51CA"),
 address.fromConventional("0019:5D58"),
 address.fromConventional("0019:5918"),

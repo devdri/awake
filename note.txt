@@ -11,20 +11,47 @@ select * from procs where has_suspicious_instr=1
 	bank remember/restore
 
 0002:529A:
-	empty if
+	empty if -- ok
 
-refactor:
-	disasm(addr) -> instr, next_addr
+0018:5168:
+	crazy stuff:
+	JP ..., FZ
+	RET FNZ
 
-	instr.is_terminal() -- no continuation at next_addr. also useful in restructured code
+TODO:
+- speedup database.
+	sqlite transactions?
+	drop sqlite, use pickle?
+- non-continuous procs: exist and make sense.
+	pro:
+		less small procedures - manageable graph
+		flow control more visible
+		more optimizations possible
+	con:
+		must keep each byte's ownership
+		discovering new procs requires recalculating old ownership (or does it? just take over bytes, a full control subtree is moved)
+- refactor operator optimizations
+	optimizations separate from substituting regs
+	heavier usage of masks, move limiting operations (and, shift) higher
+- better context deduction: from conditions
+- new context propagation algorithm, two options:
+	1) use just registers
+		pro:
+			simple, just few variables to look at
+		con:
+			in some cases (stack) more vars needed to keep accurate context
+	2) produce new variables
+		pro:
+			all possible info is saved
+		con:
+			hard to not produce junk
+- better bad-op handling:
+	display page anyway
+- handle elseif chains
+- better jumptable size heuristics
 
-	remove calls() from Instruction. Call instruction will have something special
 
-	operands() -- maybe just for BaseOp, etc. No use in general
 
-	addr -- useful.
-	opcodes -- unneeded. can be obtained easily.
-	cycles -- needed. however, could be part of opcodeeffect, using pseudoregister
 
 
 
@@ -55,26 +82,6 @@ graph construction:
 
 early optimization:
 - traverse graph, optimize with context.
-
-
-
-
-
-
-
-- procedures -- always continuous and in single bank
-- is-current -- all subprocs must be current too
-- switches -- auto limit till next code section, nice if can get continuous proc
-
-- proc dfs -> basic blocks ([blocks], dict(id -> [exits]), dict(id -> [entries]), last instruction in block constructs if/switch/loop. maybe special new instruction)
-
-Persistent DB:
-
-	procs: {start-addr, type(proc, snippet), depset, has-switch, has-ambig, is-current, is-fragmented}
-	calls: {caller-addr, callee-addr, instr-addr}
-	names: {addr, name}
-
-
 
 BANKS:
 00 MAIN CODE
@@ -130,6 +137,9 @@ mode_1 == 0:
 	mode_2 == B:
 		logo screen
 
+mode_1 == 1:
+	outro.
+
 mode_1 == 2:
 	player select
 
@@ -148,6 +158,9 @@ mode_1 == 5:
 	mode_2 == 4 -- select source
 	mode_2 == 5 -- select destination
 
+mode_1 == 6:
+	save screen
+
 mode_1 == 7:
 	map view.
 	mode_2 == 4:
@@ -155,6 +168,15 @@ mode_1 == 7:
 
 	mode_2 == 5:
 		return to game
+
+mode_1 == 8:
+	Christine photo.
+
+mode_1 == 9:
+	Marin talk.
+
+mode_1 == A:
+	Windfish tablet.
 
 mode_1 == B:
 	normal game mode
@@ -169,8 +191,24 @@ mode_1 == B:
 Giant switch opcode -- FFEB
 obj alive status -- FFEA
 	0 -- off
+	3 -- explode
 	5 -- normal
+	7 -- held by Link
+	8 -- thrown
+	6 -- on floor, returning to normal (Genie bottle style)
+
+screen_warp_mode -- 0xC17F:
+	0 - off
+	1 - go to sleep
+	2 - begin ocarina warp
+	3 - end ocarina warp
+	FF - windfish appearing and disappearing
+	FE - windfish floating
+	FD - ?
 
 6E -- butterfly
 1C -- small zol
 19 -- keese
+
+07 -- bad-op? shield-back, more powerful bracelet (get item in general)
+
