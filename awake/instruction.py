@@ -183,8 +183,8 @@ class JumpInstruction(Instruction):
         if hasattr(target, 'getAddress'):
             self.targetAddr = target.getAddress()
             self.target = target
-        if hasattr(target, 'getValue'):
-            self.targetAddr = address.fromVirtualAndCurrent(target.getValue(), addr)
+        if target.value is not None:
+            self.targetAddr = address.fromVirtualAndCurrent(target.value, addr)
             self.target = operand.ProcAddress(self.targetAddr)
         else:
             self.targetAddr = None
@@ -229,7 +229,7 @@ class CallInstruction(Instruction):
         if hasattr(target, 'getAddress'):
             self.targetAddr = target.getAddress()
         else:
-            self.targetAddr = address.fromVirtualAndCurrent(target.getValue(), addr)
+            self.targetAddr = address.fromVirtualAndCurrent(target.value, addr)
         self.target = operand.ProcAddress(self.targetAddr)
 
         self.returns_used = regutil.ALL_REGS
@@ -258,7 +258,7 @@ class CallInstruction(Instruction):
         if hasattr(self.target, 'getAddress'):
             self.targetAddr = self.target.getAddress()
         else:
-            self.targetAddr = address.fromVirtualAndCurrent(self.target.getValue(), self.addr)
+            self.targetAddr = address.fromVirtualAndCurrent(self.target.value, self.addr)
 
         deps = self.getDependencySet()
 
@@ -479,7 +479,7 @@ def make(name, operands, addr, reads, writes, values, loads):
 
     elif name == "CALL" and len(operands) == 1:
 
-        if hasattr(operands[0], 'getValue') and operands[0].getValue() == 0:
+        if operands[0].value == 0:
             return SwitchInstruction(addr)
 
         return CallInstruction(name, operands[0], placeholders.ALWAYS, addr)

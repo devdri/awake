@@ -79,7 +79,7 @@ class Context:
         return not hasattr(value, 'isComplex') or not value.isComplex()
 
     def hasConstantValue(self, register):
-        return self.hasValue(register) and hasattr(self.getValue(register), 'getValue')
+        return self.hasValue(register) and self.getValue(register).value is not None
 
     def getValue(self, register):
         if register in ('BC', 'DE', 'HL'):

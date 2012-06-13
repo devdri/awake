@@ -17,36 +17,34 @@
 import operand
 
 class Operator(operand.Operand):
-    def __init__(self):
-        pass
 
-    def childs(self):
-        return []
+    def __init__(self, *args):
+        self.childs = args
 
     def getMemreads(self):
         out = set()
-        for x in self.childs():
+        for x in self.childs:
             out |= x.getMemreads()
         return out
 
+    def optimizedWithContext(self, ctx):
+        childs = (ch.optimizedWithContext(ctx) for ch in self.childs)
+        return self.__class__.make(*childs)
+
+    @classmethod
+    def make(cls, *args):
+        return cls(*args)
+
 def isConstant(x):
-    if hasattr(x, 'getValue'):
-        return True
-    else:
-        return False
+    return x.value is not None
 
 class BinOp(Operator):
-    def __init__(self, symbol, left, right):
-        self.symbol = symbol
+    symbol = None
+
+    def __init__(self, left, right):
         self.left = left
         self.right = right
-
-    def optimizedWithContext(self, ctx):
-        left = self.left.optimizedWithContext(ctx)
-        right = self.right.optimizedWithContext(ctx)
-        if isConstant(left) and isConstant(right):
-            return operand.Constant(self.calculate(left.getValue(), right.getValue()))
-        return self.__class__(left, right)
+        self.childs = (left, right)
 
     def __str__(self):
 
@@ -74,417 +72,371 @@ class BinOp(Operator):
             right = '(' + right + ')'
         return '{0} {1} {2}'.format(left, self.symbol, right)
 
-    def childs(self):
-        return [self.left, self.right]
-
     def needParen(self, priority):
         return True
 
-class Add(BinOp):
-    def __init__(self, a, b):
-        super(Add, self).__init__('+', a, b)
+    @classmethod
+    def make(cls, left, right):
+        assert hasattr(cls, 'calculate')
+        if isConstant(left) and isConstant(right):
+            return operand.Constant(cls.calculate(left.value, right.value))
+        else:
+            return super(BinOp, cls).make(left, right)
 
-    def calculate(self, left, right):
+class Add(BinOp):
+    symbol = '+'
+
+    @staticmethod
+    def calculate(left, right):
         return (left + right) & 0xFF
 
-    def optimizedWithContext(self, ctx):
-
-        a = self.left.optimizedWithContext(ctx)
-        b = self.right.optimizedWithContext(ctx)
-        if isConstant(a) and a.getValue() == 0:
-            return b
-        if isConstant(b) and b.getValue() == 0:
-            return a
-
-        if a == b:
-            return Shl(a, operand.Constant(1)).optimizedWithContext(ctx)
-
-        return BinOp.optimizedWithContext(self, ctx)
+    @classmethod
+    def make(cls, left, right):
+        if isConstant(left) and left.value == 0:
+            return right
+        if isConstant(right) and right.value == 0:
+            return left
+        if left == right:
+            return Shl.make(left, operand.Constant(1))
+        return super(Add, cls).make(left, right)
 
 class Sub(BinOp):
-    def __init__(self, a, b):
-        super(Sub, self).__init__('-', a, b)
+    symbol = '-'
 
-    def calculate(self, left, right):
+    @staticmethod
+    def calculate(left, right):
         return (left - right) & 0xFF
 
 class And(BinOp):
-    def __init__(self, a, b):
-        super(And, self).__init__('&', a, b)
+    symbol = '&'
 
-    def calculate(self, left, right):
+    @staticmethod
+    def calculate(left, right):
         return left & right
 
-    def optimizedWithContext(self, ctx):
-        if self.left == self.right:
-            return self.left.optimizedWithContext(ctx)
+    @classmethod
+    def make(cls, left, right):
+        if isConstant(left):
+            left, right = right, left
 
-        if isConstant(self.right) and self.left.getValueMask() == self.right.getValue():
-            return self.left.optimizedWithContext(ctx)
+        if isConstant(right):
+            if (left.value_mask & right.value) == left.value_mask:
+                return left
+            if (left.value_mask & right.value) == 0:
+                return operand.Constant(0)
 
-        if isConstant(self.right) and self.right.getValue() == 0:
-            return self.right
+        if right == left:
+            return left
 
-        if isinstance(self.left, And):
-            return And(self.left.left, And(self.left.right, self.right)).optimizedWithContext(ctx)
-
-        return BinOp.optimizedWithContext(self, ctx)
+        if isinstance(left, And):
+            return And.make(left.left, And(left.right, right))
+        if isinstance(right, And):
+            return And.make(right.left, And(right.right, left))
+        return super(And, cls).make(left, right)
 
 class Or(BinOp):
-    def __init__(self, a, b):
-        super(Or, self).__init__('|', a, b)
+    symbol = '|'
 
-    def calculate(self, left, right):
+    @staticmethod
+    def calculate(left, right):
         return left | right
 
-    def optimizedWithContext(self, ctx):
-        left = self.left.optimizedWithContext(ctx)
-        right = self.right.optimizedWithContext(ctx)
-        if isConstant(left) and left.getValue() == 0:
-            return right
-        if isConstant(right) and right.getValue() == 0:
+    @classmethod
+    def make(cls, left, right):
+        if isConstant(left):
+            left, right = right, left
+
+        if isConstant(right) and right.value == 0:
             return left
         if isinstance(left, And) and isinstance(right, And):
             if left.left == right.left:
-                return And(left.left, Or(left.right, right.right)).optimizedWithContext(ctx)
-        return BinOp.optimizedWithContext(self, ctx)
+                return And.make(left.left, Or.make(left.right, right.right))
+        return super(Or, cls).make(left, right)
 
 class Xor(BinOp):
-    def __init__(self, a, b):
-        super(Xor, self).__init__('^', a, b)
+    symbol = '^'
 
-    def calculate(self, left, right):
+    @staticmethod
+    def calculate(left, right):
         return left ^ right
 
 class Equals(BinOp):
-    def __init__(self, a, b):
-        super(Equals, self).__init__('==', a, b)
+    symbol = '=='
+    bits = 1
 
-    def calculate(self, left, right):
+    @staticmethod
+    def calculate(left, right):
         return int(left == right)
 
     def logicalNot(self):
         return NotEquals(self.left, self.right)
 
 class NotEquals(BinOp):
-    def __init__(self, a, b):
-        super(NotEquals, self).__init__('!=', a, b)
+    symbol = '!='
+    bits = 1
 
-    def calculate(self, left, right):
+    @staticmethod
+    def calculate(left, right):
         return int(left != right)
 
     def logicalNot(self):
         return Equals(self.left, self.right)
 
 class Less(BinOp):
-    def __init__(self, a, b):
-        super(Less, self).__init__('<', a, b)
+    symbol = '<'
+    bits = 1
 
-    def calculate(self, left, right):
-        return left < right
+    @staticmethod
+    def calculate(left, right):
+        return int(left < right)
 
     def logicalNot(self):
         return GreaterEqual(self.left, self.right)
 
 class GreaterEqual(BinOp):
-    def __init__(self, a, b):
-        super(GreaterEqual, self).__init__('>=', a, b)
+    symbol = '>='
+    bits = 1
 
-    def calculate(self, left, right):
-        return left < right
+    @staticmethod
+    def calculate(left, right):
+        return int(left >= right)
 
     def logicalNot(self):
         return Less(self.left, self.right)
 
 class Shl(BinOp):
-    def __init__(self, a, b):
-        super(Shl, self).__init__('<<', a, b)
+    symbol = '<<'
 
-    def calculate(self, left, right):
+    @staticmethod
+    def calculate(left, right):
         return (left << right) & 0xFF
 
-    def optimizedWithContext(self, ctx):
-        left = self.left.optimizedWithContext(ctx)
-        right = self.right.optimizedWithContext(ctx)
-
-        if not isConstant(right):
-            return Shl(left, right)
-
+    @classmethod
+    def make(cls, left, right):
         if isConstant(left):
-            return operand.Constant(self.calculate(left.getValue(), right.getValue()))
+            left, right = right, left
 
-        if isinstance(left, Shl) and isConstant(left.right):
-            right = operand.Constant(right.getValue() + left.right.getValue())
-            left = left.left
+        if isConstant(right):
 
-        if isinstance(left, Shr) and isConstant(left.right):
-            sh_a = left.right.getValue()
-            sh_b = right.getValue()
-            mask = operand.Constant(((0xFF >> sh_a) << sh_b) & 0xFF)
-            sum_shift = sh_b - sh_a
+            if isinstance(left, Shl) and isConstant(left.right):
+                right = operand.Constant(right.value + left.right.value)
+                left = left.left
 
-            if sum_shift < 0:
-                return And(Shr(left.left, operand.Constant(-sum_shift)), mask).optimizedWithContext(ctx)
-            else:
-                return And(Shl(left.left, operand.Constant(sum_shift)), mask).optimizedWithContext(ctx)
+            if isinstance(left, Shr) and isConstant(left.right):
+                sh_a = left.right.value
+                sh_b = right.value
+                mask = operand.Constant(((0xFF >> sh_a) << sh_b) & 0xFF)
+                sum_shift = sh_b - sh_a
 
-        if isinstance(left, And):
-            a = left.left
-            b = left.right
-            return And(Shl(a, right), Shl(b, right)).optimizedWithContext(ctx)
+                if sum_shift < 0:
+                    return And.make(Shr.make(left.left, operand.Constant(-sum_shift)), mask)
+                else:
+                    return And.make(Shl.make(left.left, operand.Constant(sum_shift)), mask)
 
-        return Shl(left, right)
+            if isinstance(left, And):
+                a = left.left
+                b = left.right
+                return And.make(Shl.make(a, right), Shl.make(b, right))
 
-    def getValueMask(self):
+        return super(Shl, cls).make(left, right)
+
+    @property
+    def value_mask(self):
         if isConstant(self.right):
-            return (self.left.getValueMask() << self.right.getValue()) & 0xFF
+            return (self.left.value_mask << self.right.value) & 0xFF
         else:
-            return self.left.getValueMask()
+            return 0xFF #self.left.value_mask
 
 class Shr(BinOp):
-    def __init__(self, a, b):
-        super(Shr, self).__init__('>>', a, b)
+    symbol = '>>'
 
-    def calculate(self, left, right):
+    @staticmethod
+    def calculate(left, right):
         return (left >> right) & 0xFF
 
-    def optimizedWithContext(self, ctx):
-        left = self.left.optimizedWithContext(ctx)
-        right = self.right.optimizedWithContext(ctx)
-
-        if not isConstant(right):
-            return Shl(left, right)
-
+    @classmethod
+    def make(cls, left, right):
         if isConstant(left):
-            return operand.Constant(self.calculate(left.getValue(), right.getValue()))
+            left, right = right, left
 
+        if isConstant(right):
 
-        if isinstance(left, Shr) and isConstant(left.right):
-            right = operand.Constant(right.getValue() + left.right.getValue())
-            left = left.left
+            if isinstance(left, Shr) and isConstant(left.right):
+                right = operand.Constant(right.value + left.right.value)
+                left = left.left
 
-        if isinstance(left, Shl) and isConstant(left.right):
-            sh_a = left.right.getValue()
-            sh_b = right.getValue()
-            mask = operand.Constant(((0xFF << sh_a) & 0xFF) >> sh_b)
-            sum_shift = sh_b - sh_a
+            if isinstance(left, Shl) and isConstant(left.right):
+                sh_a = left.right.value
+                sh_b = right.value
+                mask = operand.Constant(((0xFF << sh_a) & 0xFF) >> sh_b)
+                sum_shift = sh_b - sh_a
 
-            if sum_shift < 0:
-                return And(Shl(left.left, operand.Constant(-sum_shift)), mask).optimizedWithContext(ctx)
-            else:
-                return And(Shr(left.left, operand.Constant(sum_shift)), mask).optimizedWithContext(ctx)
+                if sum_shift < 0:
+                    return And.make(Shl.make(left.left, operand.Constant(-sum_shift)), mask)
+                else:
+                    return And.make(Shr.make(left.left, operand.Constant(sum_shift)), mask)
 
-        if isinstance(left, And):
-            a = left.left
-            b = left.right
-            return And(Shr(a, right), Shr(b, right)).optimizedWithContext(ctx)
+            if isinstance(left, And):
+                a = left.left
+                b = left.right
+                return And.make(Shr.make(a, right), Shr.make(b, right))
 
-        return Shr(left, right)
+        return super(Shr, cls).make(left, right)
 
-    def getValueMask(self):
+    @property
+    def value_mask(self):
         if isConstant(self.right):
-            return self.left.getValueMask() >> self.right.getValue()
+            return self.left.value_mask >> self.right.value
         else:
-            return self.left.getValueMask()
+            return 0xFF #self.left.value_mask
 
 class LogicalNot(Operator):
-    def __init__(self, a):
-        self.a = a
+    bits = 1
 
     def __str__(self):
-        return 'not '+str(self.a)
+        return 'not '+str(self.childs[0])
 
-    def optimizedWithContext(self, ctx):
-        inner = self.a.optimizedWithContext(ctx)
+    @classmethod
+    def make(cls, inner):
         if hasattr(inner, 'logicalNot'):
             return inner.logicalNot()
-        return LogicalNot(inner)
+        return super(LogicalNot, cls).make(inner)
 
-    def childs(self):
-        return set([self.a])
+class Add16(BinOp):
+    symbol = '+.'
+    bits = 16
 
+    @staticmethod
+    def calculate(a, b):
+        return (a + b) & 0xFFFF
+
+    @classmethod
+    def make(cls, left, right):
+        if isConstant(left):
+            left, right = right, left
+        if isConstant(right) and right.value == 0:
+            return left
+        return super(Add16, cls).make(left, right)
+
+class Sub16(BinOp):
+    symbol = '-.'
+    bits = 16
+
+    @staticmethod
+    def calculate(a, b):
+        return (a - b) & 0xFFFF
+
+class Shl16(BinOp):
+    symbol = '<<.'
+    bits = 16
+
+    @staticmethod
+    def calculate(a, b):
+        return (a << b) & 0xFFFF
+
+class Shr16(BinOp):
+    symbol = '>>.'
+    bits = 16
+
+    @staticmethod
+    def calculate(a, b):
+        return (a >> b) & 0xFFFF
 
 class FuncOperator(Operator):
-    def __init__(self, name, args):
-        self.name = name
-        self.args = args
+    name = None
 
     def __str__(self):
-        return '{0}({1})'.format(self.name, ', '.join(str(x) for x in self.args))
+        return '{0}({1})'.format(self.name, ', '.join(str(x) for x in self.childs))
 
     def html(self):
-        return '{0}({1})'.format(self.name, ', '.join(x.html() for x in self.args))
-
-    def childs(self):
-        return self.args
-
-    def optimizedWithContext(self, ctx):
-        args = [a.optimizedWithContext(ctx) for a in self.args]
-
-        if hasattr(self, 'calculate') and all(isConstant(x) for x in args):
-            values = [x.getValue() for x in args]
-            return operand.Constant(self.calculate(*values))
-
-        return self.__class__(*args)
+        return '{0}({1})'.format(self.name, ', '.join(x.html() for x in self.childs))
 
     def __eq__(self, other):
         if not hasattr(other, 'name') or not hasattr(other, 'args'):
             return False
         return self.name == other.name and self.args == other.args
 
-class Add16(BinOp):
-    def __init__(self, a, b):
-        super(Add16, self).__init__('+.', a, b)
-
-    def optimizedWithContext(self, ctx):
-
-        a = self.left.optimizedWithContext(ctx)
-        b = self.right.optimizedWithContext(ctx)
-        if isConstant(a) and a.getValue() == 0:
-            return b
-        if isConstant(b) and b.getValue() == 0:
-            return a
-
-        return BinOp.optimizedWithContext(self, ctx)
-
-    def calculate(self, a, b):
-        return (a + b) & 0xFFFF
-
-    def bits(self):
-        return 16
-
-class Sub16(BinOp):
-    def __init__(self, a, b):
-        super(Sub16, self).__init__('-.', a, b)
-
-    def calculate(self, a, b):
-        return (a - b) & 0xFFFF
-
-    def bits(self):
-        return 16
-
-class Shl16(BinOp):
-    def __init__(self, a, b):
-        super(Shl16, self).__init__('<<.', a, b)
-
-    def calculate(self, a, b):
-        return (a << b) & 0xFFFF
-
-    def bits(self):
-        return 16
-
-class Shr16(BinOp):
-    def __init__(self, a, b):
-        super(Shr16, self).__init__('>>.', a, b)
-
-    def calculate(self, a, b):
-        return (a >> b) & 0xFFFF
-
-    def bits(self):
-        return 16
+    @classmethod
+    def make(cls, *args):
+        if hasattr(cls, 'calculate') and all(isConstant(x) for x in args):
+            values = [x.value for x in args]
+            return operand.Constant(cls.calculate(*values))
+        return super(FuncOperator, cls).make(*args)
 
 class PopValue(FuncOperator):
-    def __init__(self, a):
-        super(PopValue, self).__init__('popval', [a])
-        self.a = a
-
-    def optimizedWithContext(self, ctx):
-        a = self.a.optimizedWithContext(ctx)
-        if hasattr(a, 'name') and a.name == 'push':
-            return a.args[1]
-        return self.__class__(a)
+    name = 'popval'
 
     def getDependencies(self):
         return FuncOperator.getDependencies(self) | set(['mem'])
+
+    @classmethod
+    def make(cls, a):
+        if hasattr(a, 'name') and a.name == 'push':
+            return a.childs[1]
+        return super(PopValue, cls).make(a)
 
 class PopStack(FuncOperator):
-    def __init__(self, a):
-        super(PopStack, self).__init__('popst', [a])
-        self.a = a
-
-    def optimizedWithContext(self, ctx):
-        a = self.a.optimizedWithContext(ctx)
-        if hasattr(a, 'name') and a.name == 'push':
-            return a.args[0]
-        return self.__class__(a)
+    name = 'popst'
 
     def getDependencies(self):
         return FuncOperator.getDependencies(self) | set(['mem'])
+
+    @classmethod
+    def make(cls, a):
+        if hasattr(a, 'name') and a.name == 'push':
+            return a.childs[0]
+        return super(PopStack, cls).make(a)
 
 
 class Push(FuncOperator):
-    def __init__(self, a, b):
-        super(Push, self).__init__('push', [a, b])
+    name = 'push'
 
     def getDependencies(self):
         return FuncOperator.getDependencies(self) | set(['mem'])
 
 class CarryOfAdd(FuncOperator):
-    def __init__(self, a, b):
-        super(CarryOfAdd, self).__init__('c_add', [a, b])
+    name = 'c_add'
 
 class LowByte(FuncOperator):
-    def __init__(self, arg):
-        super(LowByte, self).__init__('lo', [arg])
-        self.arg = arg
+    name = 'lo'
 
-    def optimizedWithContext(self, ctx):
-        arg = self.arg.optimizedWithContext(ctx)
-        if isConstant(arg):
-            return operand.Constant(self.calculate(arg.getValue()))
-        return self.__class__(arg)
-
-    def calculate(self, arg):
+    @staticmethod
+    def calculate(arg):
         return arg & 0xFF
 
 class HighByte(FuncOperator):
-    def __init__(self, arg):
-        super(HighByte, self).__init__('hi', [arg])
-        self.arg = arg
+    name = 'hi'
 
-    def optimizedWithContext(self, ctx):
-        arg = self.arg.optimizedWithContext(ctx)
-        if isConstant(arg):
-            return operand.Constant(self.calculate(arg.getValue()))
-        return self.__class__(arg)
-
-    def calculate(self, arg):
+    @staticmethod
+    def calculate(arg):
         return arg >> 8
 
 class Word(FuncOperator):
-    def __init__(self, h, l):
-        super(Word, self).__init__('word', [h, l])
-        self.hi = h
-        self.lo = l
+    name = 'word'
+    bits = 16
 
-    def optimizedWithContext(self, ctx):
-        hi = self.hi.optimizedWithContext(ctx)
-        lo = self.lo.optimizedWithContext(ctx)
-        if isConstant(hi) and isConstant(lo):
-            return operand.Constant(self.calculate(hi.getValue(), lo.getValue()))
+    @staticmethod
+    def calculate(hi, lo):
+        return (hi << 8) | lo
 
+    @classmethod
+    def make(cls, hi, lo):
         # merge word
         if isinstance(hi, HighByte) and isinstance(lo, LowByte):
-            if hi.arg == lo.arg:
-                return hi.arg
+            if hi.childs[0] == lo.childs[0]:
+                return hi.childs[0]
 
         # high zero
-        if isConstant(hi) and hi.getValue() == 0:
+        if isConstant(hi) and hi.value == 0:
             return lo
 
         if isinstance(hi, Shr) and isinstance(lo, Shl) and hi.left == lo.left and isConstant(hi.right) and isConstant(lo.right):
-            hi_sh = hi.right.getValue()
-            lo_sh = lo.right.getValue()
+            hi_sh = hi.right.value
+            lo_sh = lo.right.value
             if hi_sh + lo_sh == 8:
-                return Shl16(lo.left, operand.Constant(lo_sh))
+                return Shl16.make(lo.left, operand.Constant(lo_sh))
 
-        return self.__class__(hi, lo)
-
-    def calculate(self, hi, lo):
-        return (hi << 8) | lo
-
-    def bits(self):
-        return 16
+        return super(Word, cls).make(hi, lo)
 
 binary_operators = {
     '+': (1, Add),

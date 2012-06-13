@@ -28,7 +28,7 @@ class Test(unittest.TestCase):
         ctx.setValue('A', operand.Constant(1))
         e = expression.parse("1+A")
         e = e.optimizedWithContext(ctx)
-        self.assertEquals(e.getValue(), 2)
+        self.assertEquals(e.value, 2)
 
     def testBlah(self):
         e = expression.parse("(A>>7)<<1")

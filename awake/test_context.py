@@ -41,7 +41,7 @@ class Test(unittest.TestCase):
         c.setValue('B', operand.Constant(1))
         self.assertFalse(c.hasValue('A'))
         self.assertTrue(c.hasValue('B'))
-        self.assertEquals(c.getValue('B').getValue(), 1)
+        self.assertEquals(c.getValue('B').value, 1)
 
     def testLoadInstructions(self):
         context = Context()
@@ -53,8 +53,8 @@ class Test(unittest.TestCase):
         a = a.optimizedWithContext(context)
         b = b.optimizedWithContext(context)
         c = c.optimizedWithContext(context)
-        self.assertEquals(b.source.target.getValue(), 0xFFFF)
-        self.assertEquals(c.source.getValue(), 1)
+        self.assertEquals(b.source.target.value, 0xFFFF)
+        self.assertEquals(c.source.value, 1)
 
     def testDependencies(self):
         q = instruction.LoadInstruction('LD', placeholders.HL, operand.Constant(0xFFFF))
