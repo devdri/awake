@@ -20,7 +20,7 @@ import context
 import regutil
 import html
 import depend
-import disasm
+import placeholders
 
 class Label(instruction.BaseOp):
     def __init__(self, addr):
@@ -211,14 +211,18 @@ class Block(instruction.Instruction):
                 out.add(x)
 
 class Switch(instruction.Instruction):
-    def __init__(self, addr, branches):
+    def __init__(self, addr, branches, arg=None):
         self.name = 'switch-highlevel'
+        if not arg:
+            self.arg = placeholders.A
+        else:
+            self.arg = arg
         self.addr = addr
         self.branches = branches
         self.jtAddr = operand.JumpTableAddress(addr.offset(1))
 
     def html(self, indent):
-        out = html.instruction(self.addr, 'switch (A, '+self.jtAddr.html()+') {', '', indent)
+        out = html.instruction(self.addr, 'switch ('+self.arg.html()+', '+self.jtAddr.html()+') {', '', indent)
         for (i, b) in enumerate(self.branches):
             out += html.instruction(self.addr, 'case '+operand.Constant(i).html()+':', '', indent)
             out += b.html(indent+1)
@@ -231,12 +235,13 @@ class Switch(instruction.Instruction):
         out.add(self)
 
     def optimizedWithContext(self, ctx):
+        arg = self.arg.optimizedWithContext(ctx)
         branches = [b.optimizedWithContext(ctx.clone()) for b in self.branches]
         ctx.invalidateAll()
-        return Switch(self.addr, branches)
+        return Switch(self.addr, branches, arg)
 
     def getDependencies(self, needed):
-        deps = set(['A'])
+        deps = self.arg.getDependencies()
         for b in self.branches:
             deps |= b.getDependencies(needed)
         return deps
@@ -245,11 +250,11 @@ class Switch(instruction.Instruction):
         deps = depend.DependencySet()
         for b in self.branches:
             deps = depend.parallel(b.getDependencySet(), deps)
-        return depend.DependencySet(deps.reads | set(['A']), deps.writes)
+        return depend.DependencySet(deps.reads | self.arg.getDependencies(), deps.writes)
 
     def optimizeDependencies(self, needed):
         branches = [b.optimizeDependencies(needed) for b in self.branches]
-        return Switch(self.addr, branches)
+        return Switch(self.addr, branches, self.arg)
 
 
 class If(instruction.Instruction):
