@@ -260,5 +260,5 @@ def produce_map():
 
     c.close()
 
-    img.save('ownership.png')
+    img.save('data/ownership.png')
     print 'image saved'

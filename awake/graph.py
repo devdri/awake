@@ -23,7 +23,7 @@ def addr_symbol(addr):
     return 'A' + str(addr).replace(':', '_')
 
 def save_dot(procs):
-    with open('graph.dot', 'w') as f:
+    with open('data/graph.dot', 'w') as f:
         f.write("digraph crossref {\n")
         for addr in procs:
             tags = ''
