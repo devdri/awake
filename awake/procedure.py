@@ -68,6 +68,8 @@ def manualJumptableLimit(addr):
         return 2
     elif addr == address.fromConventional("0004:76B4"):
         return 6
+    elif addr == address.fromConventional("0004:4E8C"):
+        return 4
     elif addr == address.fromConventional("0005:7210"):
         return 5
 
@@ -178,7 +180,7 @@ class ProcedureRangeAnalysis(object):
 
         if instr.hasContinue():
             self.queue.add(next_addr)
-            if instr.name == 'RET' or instr.jumps():  # TODO: XXX: maybe not nicest
+            if instr.name == 'RET' or instr.allJumps():  # TODO: XXX: maybe not nicest
                 self.block_starts.add(next_addr)
 
         for jump_addr in instr.jumps():

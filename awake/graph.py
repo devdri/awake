@@ -364,6 +364,20 @@ address.fromVirtual(0x100), address.fromVirtual(0x40), address.fromVirtual(0x48)
 ]
     #input = [address.fromVirtual(0x100), address.fromVirtual(0x40), address.fromVirtual(0x48)]
     """
+    input = [
+# in 0000:0C40
+address.fromConventional("0002:5023"),
+address.fromConventional("0002:4D92"),
+address.fromConventional("0002:490E"),
+address.fromConventional("0002:4D00"),
+address.fromConventional("0002:4F30"),
+address.fromConventional("0002:50A2"),
+address.fromConventional("0002:4EFF"),
+
+# in 0000:0B53
+address.fromConventional("0002:5DD5"),
+address.fromConventional("0002:5731"),
+]
 
     import database
 
