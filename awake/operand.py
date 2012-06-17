@@ -41,10 +41,7 @@ class Operand(object):
         return self
 
     def getDependencies(self):
-        out = set()
-        for ch in self.childs:
-            out |= ch.getDependencies()
-        return out
+        return set.union(set(), *(ch.getDependencies() for ch in self.childs))
 
     def needParen(self, priority):
         return False
@@ -99,6 +96,7 @@ class AddressConstant(Constant):
             addr = address.fromVirtual(addr)
         super(AddressConstant, self).__init__(addr.virtual())
         self.addr = addr
+        self.value = addr.virtual()
 
     def getAddress(self):
         return self.addr
@@ -183,7 +181,7 @@ class Dereference(Operand):
         self.addr = addr
         if hasattr(target, "getAddress"):
             self.target = target
-        if target.value is not None:
+        elif target.value is not None:
             if addr is not None:
                 self.target = DataAddress(address.fromVirtualAndCurrent(target.value, addr))
             else:
@@ -201,6 +199,8 @@ class Dereference(Operand):
 
     def optimizedWithContext(self, ctx):
         target = self.target.optimizedWithContext(ctx)
+        if not hasattr(target, 'getAddress') and target.value is not None:
+            target = DataAddress(address.fromVirtual(target.value)).optimizedWithContext(ctx)
         return Dereference(target, self.addr)
 
     def getDependencies(self):

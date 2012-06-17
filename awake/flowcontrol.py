@@ -21,11 +21,12 @@ import regutil
 import html
 import depend
 import placeholders
+import address
 
 class Label(instruction.BaseOp):
     def __init__(self, addr):
         super(Label, self).__init__('label', [operand.AddressConstant(addr)])
-        self.addr = addr
+        self.addr = address.fromVirtual(0)
         self.gotos = set()
         self.breaks = set()
         self.continues = set()
@@ -42,8 +43,9 @@ class Label(instruction.BaseOp):
         self.continues.add(x)
 
     def optimizedWithContext(self, ctx):
-        for w in self.depset.writes:
-            ctx.setValueComplex(w)
+        if self.gotos or self.breaks or self.continues:
+            for w in self.depset.writes:
+                ctx.setValueComplex(w)
         return self
 
     def setContextWrites(self, writes):
@@ -68,6 +70,8 @@ class Label(instruction.BaseOp):
         return ' @ ' + ', '.join(ins)
 
     def html(self, indent=0, labels=None):
+        if not self.gotos:
+            return ''
         return '<a name="{0}">label_{1}</a>: {2}\n'.format(self.addr, self.addr, self.signature())
 
 class FlowTerminator(instruction.BaseOp):
@@ -237,7 +241,9 @@ class Switch(instruction.Instruction):
     def optimizedWithContext(self, ctx):
         arg = self.arg.optimizedWithContext(ctx)
         branches = [b.optimizedWithContext(ctx.clone()) for b in self.branches]
-        ctx.invalidateAll()
+        for b in self.branches:
+            for w in b.getDependencySet().writes:
+                ctx.setValueComplex(w)
         return Switch(self.addr, branches, arg)
 
     def getDependencies(self, needed):
@@ -261,6 +267,7 @@ class If(instruction.Instruction):
     def __init__(self, split, cond, option_a, option_b):
         self.name = 'if'
         self.split = split
+        self.addr = split
         self.cond = cond
         self.option_a = option_a
         self.option_b = option_b
@@ -279,7 +286,7 @@ class If(instruction.Instruction):
         return self.option_a.hasContinue() or self.option_b.hasContinue()
 
     def html(self, indent):
-        addr = self.split
+        addr = self.addr
         out = html.instruction(addr, 'if ('+self.cond.html()+') {', '', indent)
 
         if not self.option_a and not self.option_b:
@@ -371,9 +378,11 @@ class LoopWhile(instruction.Instruction):
 class DoWhile(LoopWhile):
     def __init__(self, inner, postcond, continue_label):
         self.name = 'do-while'
+        self.addr = address.fromVirtual(0)
         self.inner = inner
         self.postcond = postcond
         self.continue_label = continue_label
+        continue_label.addContinue(self)
 
     def html(self, indent):
         addr = "0000:0000"  # TODO: inner first addr
@@ -428,7 +437,9 @@ class While(LoopWhile):
     def __init__(self, inner, continue_label):
         self.name = 'while'
         self.inner = inner
+        self.addr = address.fromVirtual(0)
         self.continue_label = continue_label
+        continue_label.addContinue(self)
 
     def html(self, indent):
         addr = "0000:0000"  # TODO: inner first addr

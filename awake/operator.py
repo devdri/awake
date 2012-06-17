@@ -22,10 +22,7 @@ class Operator(operand.Operand):
         self.childs = args
 
     def getMemreads(self):
-        out = set()
-        for x in self.childs:
-            out |= x.getMemreads()
-        return out
+        return set.union(set(), *(ch.getMemreads() for ch in self.childs))
 
     def optimizedWithContext(self, ctx):
         childs = (ch.optimizedWithContext(ctx) for ch in self.childs)
@@ -92,9 +89,9 @@ class Add(BinOp):
 
     @classmethod
     def make(cls, left, right):
-        if isConstant(left) and left.value == 0:
+        if left.value == 0:
             return right
-        if isConstant(right) and right.value == 0:
+        if right.value == 0:
             return left
         if left == right:
             return Shl.make(left, operand.Constant(1))
@@ -128,10 +125,12 @@ class And(BinOp):
         if right == left:
             return left
 
-        if isinstance(left, And):
-            return And.make(left.left, And(left.right, right))
-        if isinstance(right, And):
-            return And.make(right.left, And(right.right, left))
+        #if isinstance(left, And):
+        #    return And.make(left.left, And(left.right, right))
+        #if isinstance(right, And):
+        #    return And.make(right.left, And(right.right, left))
+        if isinstance(left, Or) and isConstant(right):
+            return Or.make(And.make(left.left, right), And.make(left.right, right))
         return super(And, cls).make(left, right)
 
 class Or(BinOp):
@@ -146,7 +145,7 @@ class Or(BinOp):
         if isConstant(left):
             left, right = right, left
 
-        if isConstant(right) and right.value == 0:
+        if right.value == 0:
             return left
         if isinstance(left, And) and isinstance(right, And):
             if left.left == right.left:
@@ -314,8 +313,10 @@ class Add16(BinOp):
     def make(cls, left, right):
         if isConstant(left):
             left, right = right, left
-        if isConstant(right) and right.value == 0:
+        if right.value == 0:
             return left
+        if isinstance(left, Add16) and isConstant(right) and isConstant(left.right):
+            return cls.make(left.left, operand.Constant(cls.calculate(right.value, left.right.value)))
         return super(Add16, cls).make(left, right)
 
 class Sub16(BinOp):
@@ -427,7 +428,7 @@ class Word(FuncOperator):
                 return hi.childs[0]
 
         # high zero
-        if isConstant(hi) and hi.value == 0:
+        if hi.value == 0:
             return lo
 
         if isinstance(hi, Shr) and isinstance(lo, Shl) and hi.left == lo.left and isConstant(hi.right) and isConstant(lo.right):

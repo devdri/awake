@@ -317,7 +317,7 @@ class CallInstruction(Instruction):
 
 class TailCall(CallInstruction):
     def __init__(self, target):
-        super(TailCall, self).__init__('tail-call', target, placeholders.ALWAYS, target)
+        super(TailCall, self).__init__('tail-call', target, placeholders.ALWAYS, target.getAddress())
 
 
 class SwitchInstruction(BaseOp):
@@ -331,6 +331,7 @@ class SwitchInstruction(BaseOp):
     def hasContinue(self):
         return False
 
+    """
     def jtSize(self):
         x = self.addr.offset(1).physical()
         if x == 0x04B3:  # serious_jt
@@ -386,7 +387,7 @@ class SwitchInstruction(BaseOp):
             limit = 0
 
         return [t.getAddress() for t in self.jt.targets][:limit]  # TODO: XXX
-
+    """
     def jumpsForSize(self, size):
         return [t.getAddress() for t in self.jt.targets][:size]
 
