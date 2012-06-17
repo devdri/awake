@@ -48,6 +48,12 @@ class Context:
         if register in ('BC', 'DE', 'HL'):
             self.setValue(register[0], hi(value))
             self.setValue(register[1], lo(value))
+        elif register == 'AF':
+            self.setValue('A', hi(value))
+            self.setValueComplex('FZ')
+            self.setValueComplex('FC')
+            self.setValueComplex('FN')
+            self.setValueComplex('FH')
         else:
             self.invalidate(register)
 
