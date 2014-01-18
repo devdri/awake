@@ -16,8 +16,6 @@
 
 import sqlite3
 
-connection = sqlite3.connect('data/tags.db')
-
 defaults = {
     'IO:FF04': 'IO:DIV',
     'IO:FF05': 'IO:TIMA',
@@ -39,37 +37,58 @@ defaults = {
     'IO:FF0F': 'IO:IF',
 }
 
-def init():
-    c = connection.cursor()
-    c.execute('create table if not exists tags(addr text, name text)')
-    c.close()
-    connection.commit()
+class TagDB(object):
+    def __init__(self, filename):
+        self.connection = sqlite3.connect(filename)
 
-def nameForAddress(addr):
-    if str(addr) in defaults:
-        return defaults[str(addr)]
+        c = self.connection.cursor()
+        c.execute('create table if not exists tags(addr text, name text)')
+        c.close()
+        self.connection.commit()
 
-    c = connection.cursor()
-    c.execute('select name from tags where addr=?', (str(addr),))
-    result = c.fetchone()
-    c.close()
+    def hasNameForAddress(self, addr):
+        if str(addr) in defaults:
+            return True
 
-    if result:
-        return result[0]
-    else:
-        return str(addr)
+        c = self.connection.cursor()
+        c.execute('select name from tags where addr=?', (str(addr),))
+        result = c.fetchone()
+        c.close()
+        return bool(result)
 
+    def nameForAddress(self, addr):
+        if str(addr) in defaults:
+            return defaults[str(addr)]
 
-def setNameForAddress(addr, name):
-    c = connection.cursor()
-    c.execute('select name from tags where addr=?', (str(addr),))
-    if c.fetchone():
-        print('updating')
-        c.execute('update tags set name=? where addr=?', (name, str(addr)))
-    else:
-        print('new')
-        c.execute('insert into tags (addr, name) values (?, ?)', (str(addr), name))
-    c.close()
-    connection.commit()
+        c = self.connection.cursor()
+        c.execute('select name from tags where addr=?', (str(addr),))
+        result = c.fetchone()
+        c.close()
 
-init()
+        if result:
+            return result[0]
+        else:
+            return str(addr)
+
+    def setNameForAddress(self, addr, name):
+        c = self.connection.cursor()
+        c.execute('select name from tags where addr=?', (str(addr),))
+        if c.fetchone():
+            print('updating')
+            c.execute('update tags set name=? where addr=?', (name, str(addr)))
+        else:
+            print('new')
+            c.execute('insert into tags (addr, name) values (?, ?)', (str(addr), name))
+        c.close()
+        self.connection.commit()
+
+_global_db = None
+
+def setGlobalTagDB(db):
+    global _global_db
+    _global_db = db
+
+def getGlobalTagDB():
+    return _global_db
+
+setGlobalTagDB(TagDB('data/tags.db'))

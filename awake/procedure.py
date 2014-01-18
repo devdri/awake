@@ -14,13 +14,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from . import database
+from awake.database import getGlobalDatabase
 from . import disasm
 from . import address
 from . import html
 from . import instruction
 from . import operand
-from . import tag
+from awake.tag import getGlobalTagDB
 from collections import defaultdict
 
 def manualJumptableLimit(addr):
@@ -220,7 +220,7 @@ class ProcedureRangeAnalysis(object):
         self.jumptable_sizes = dict((k, v) for (k, v) in self.jumptable_sizes.items() if self.isLocalAddr(k))
 
     def html(self):
-        out = '<h1>Procedure {0}</h1>\n'.format(tag.nameForAddress(self.start_addr));
+        out = '<h1>Procedure {0}</h1>\n'.format(getGlobalTagDB().nameForAddress(self.start_addr));
         out += '<pre class="disasm">';
         from . import disasm
         for addr in sorted(self.visited):
@@ -240,7 +240,7 @@ def getLimit(addr):
     else:
         bank_limit = address.fromVirtual(0xFFFF)
 
-    next_owned = database.getNextOwnedAddress(addr)
+    next_owned = getGlobalDatabase().getNextOwnedAddress(addr)
 
     if not next_owned or bank_limit < next_owned:
         return bank_limit
@@ -374,7 +374,7 @@ class ProcedureGraph(object):
 
     def html(self):
         out = ''
-        out += 'Proc graph ' + tag.nameForAddress(self.start_addr)
+        out += 'Proc graph ' + getGlobalTagDB().nameForAddress(self.start_addr)
         out += '<pre class="disasm">'
         for i, b in enumerate(self.blocks):
             out += 'BLOCK' + str(i) + '\n'

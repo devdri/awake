@@ -18,16 +18,16 @@ from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from urlparse import urlparse, parse_qs
 from . import address
 from awake import flow
-from . import tag
 from . import operand
 from . import jumptable
 from . import procedure
 from . import graph
-from awake import database
+from awake.database import Database, getGlobalDatabase, setGlobalDatabase
+from awake.tag import TagDB, getGlobalTagDB, setGlobalTagDB
 
 def proc_page(addr, out):
 
-    info = database.procInfo(addr)
+    info = getGlobalDatabase().procInfo(addr)
     out.write('callers: ' + ', '.join(operand.ProcAddress(x).html() for x in info.callers) + '<br />')
 
     flow.refresh(addr)
@@ -43,7 +43,7 @@ def proc_page(addr, out):
 def data_page(addr):
     out = ''
 
-    reads, writes = database.getDataReferers(addr)
+    reads, writes = getGlobalDatabase().getDataReferers(addr)
 
     out += '<pre>\n'
     out += 'reads:\n'
@@ -59,13 +59,13 @@ def jumptable_page(addr):
     return jumptable.JumpTable(addr).html()
 
 def bank_page(bank):
-    return database.bankReport(bank)
+    return getGlobalDatabase().bankReport(bank)
 
 def name_form(addr):
     out = ''
     out += '<form class="name-form" method="get" action="/set-name">'
     out += '<input type="hidden" name="addr" value="{0}" />'.format(addr)
-    out += '<input type="text" name="name" value="{0}" />'.format(tag.nameForAddress(addr))
+    out += '<input type="text" name="name" value="{0}" />'.format(getGlobalTagDB().nameForAddress(addr))
     out += '<input type="submit" value="ok" />'
     out += '</form>'
     return out
@@ -101,7 +101,7 @@ class Handler(BaseHTTPRequestHandler):
 
             self.ok_html()
             self.wfile.write("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"/style.css\" /></head><body>")
-            self.wfile.write(database.getInteresting())
+            self.wfile.write(getGlobalDatabase().getInteresting())
             self.wfile.write("</body></html>")
 
         elif self.path.startswith('/data/'):
@@ -156,7 +156,7 @@ class Handler(BaseHTTPRequestHandler):
             print(p, q)
             addr = address.fromConventional(p['addr'][0])
             name = p['name'][0]
-            tag.setNameForAddress(addr, name)
+            taggetGlobalTagDB().setNameForAddress(addr, name)
             self.redirect(self.headers['Referer'])
 
         else:
@@ -164,6 +164,11 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
 
 def run():
+    database = Database('data/xxx.db')
+    setGlobalDatabase(database)
+    tags = TagDB('data/tags.db')
+    setGlobalTagDB(tags)
+
     import traceback
     try:
         print('')

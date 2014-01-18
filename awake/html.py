@@ -14,16 +14,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from . import tag
+from awake.tag import getGlobalTagDB
 
 def span(contents, klass):
     return '<span class="{1}">{0}</span>'.format(contents, klass)
 
 def addr_link(prefix, addr, klass):
-    return '<a class="{0}" href="{1}{2}">{3}</a>'.format(klass, prefix, addr, tag.nameForAddress(addr))
+    return '<a class="{0}" href="{1}{2}">{3}</a>'.format(klass, prefix, addr, getGlobalTagDB().nameForAddress(addr))
 
 def label(addr):
-    return '<a name="{0}">label_{1}</a>:\n'.format(addr, tag.nameForAddress(addr))
+    return '<a name="{0}">label_{1}</a>:\n'.format(addr, getGlobalTagDB().nameForAddress(addr))
 
 def pad(indent):
     return '    ' * indent

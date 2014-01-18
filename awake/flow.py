@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from collections import defaultdict
-from . import tag
+from awake.tag import getGlobalTagDB
 from awake import procedure
 from . import regutil
 from . import context
@@ -23,7 +23,7 @@ from . import flowcontrol
 from . import address
 from . import depend
 from . import operand
-from . import database
+from awake.database import getGlobalDatabase
 
 def select_any(x):
     return next(iter(x), None)
@@ -391,7 +391,7 @@ class ProcedureFlow(object):
         return self._tail_calls
 
     def html(self):
-        out = '<h1>Procedure flow {0}</h1>\n'.format(tag.nameForAddress(self.addr));
+        out = '<h1>Procedure flow {0}</h1>\n'.format(getGlobalTagDB().nameForAddress(self.addr));
         out += '<pre class="disasm">\n';
         out += self.content.html()
         out += '</pre>\n'
@@ -403,7 +403,7 @@ class ProcedureFlow(object):
 
 def update_info(proc):
     print('Updating info for', proc.addr)
-    info = database.procInfo(proc.addr)
+    info = getGlobalDatabase().procInfo(proc.addr)
     info.depset = proc.getDependencySet()
     info.has_switch = proc.has_switch
     info.suspicious_switch = proc.suspicious_switch
@@ -416,7 +416,7 @@ def update_info(proc):
     info.tail_calls = proc.tailCalls()
     info.memreads = proc.memreads
     info.memwrites = proc.memwrites
-    info.save()
+    info.save(getGlobalDatabase().connection)
 
 cache = dict()
 def refresh(addr):

@@ -21,7 +21,7 @@ from . import operand
 from . import address
 from . import html
 from . import depend
-from . import database
+from awake.database import getGlobalDatabase
 from . import expression
 
 class Instruction(object):
@@ -258,7 +258,7 @@ class CallInstruction(Instruction):
         return (needed - deps.writes) | deps.reads
 
     def getDependencySet(self):
-        deps = database.procInfo(self.targetAddr).depset
+        deps = getGlobalDatabase().procInfo(self.targetAddr).depset
         reads = set(deps.reads)
         for r in regutil.joinRegisters(reads):
             if r in self.constant_params:

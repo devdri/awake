@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from collections import defaultdict
-from . import tag
+from awake.tag import getGlobalTagDB
 from PIL import Image
 from . import address
 
@@ -28,8 +28,8 @@ def save_dot(procs):
         for addr in procs:
             tags = ''
 
-            from . import database
-            info = database.procInfo(addr)
+            from awake.database import getGlobalDatabase
+            info = getGlobalDatabase().procInfo(addr)
 
             if info.has_switch:
                 tags += ' switch'
@@ -42,7 +42,7 @@ def save_dot(procs):
             if info.has_suspicious_instr:
                 tags += ' suspicious'
 
-            f.write('    ' + addr_symbol(addr) + ' [label="' + tag.nameForAddress(addr) + tags + '"];\n')
+            f.write('    ' + addr_symbol(addr) + ' [label="' + getGlobalTagDB().nameForAddress(addr) + tags + '"];\n')
             if tags:
                 f.write('    ' + addr_symbol(addr) + ' [color="green"];\n')
 
@@ -79,15 +79,15 @@ def save_dot_for_bank(bank):
     with open('data/bank'+bank_name+'.dot', 'w') as f:
         f.write("digraph crossref {\n")
 
-        from . import database
-        cur = database.connection.cursor()
+        from awake.database import getGlobalDatabase
+        cur = getGlobalDatabase().connection.cursor()
         cur.execute('select addr from procs where substr(addr, 0, 5)=?', (bank_name,))
         for proc_result in cur.fetchall():
             addr = address.fromConventional(proc_result[0])
             tags = ''
 
-            from . import database
-            info = database.procInfo(addr)
+            from awake.database import getGlobalDatabase
+            info = getGlobalDatabase().procInfo(addr)
 
             is_public = False
 
@@ -112,7 +112,7 @@ def save_dot_for_bank(bank):
             if is_public:
                 tags += ' public'
 
-            f.write('    ' + addr_symbol(addr) + ' [label="' + tag.nameForAddress(addr) + tags + '"];\n')
+            f.write('    ' + addr_symbol(addr) + ' [label="' + getGlobalTagDB().nameForAddress(addr) + tags + '"];\n')
             f.write('    ' + addr_symbol(addr) + ' [style="filled"];\n')
 
             for c in info.calls:
@@ -168,14 +168,14 @@ def getSubgraph(start_points):
     queue = set(start_points)
     verts = set()
 
-    from . import database
+    from awake.database import getGlobalDatabase
     while queue:
         x = queue.pop()
         if x in verts:
             continue
 
         verts.add(x)
-        info = database.procInfo(x)
+        info = getGlobalDatabase().procInfo(x)
         for c in info.calls:
             queue.add(c)
     return verts
@@ -432,11 +432,11 @@ address.fromConventional("0002:5DD5"),
 address.fromConventional("0002:5731"),
 ]
 
-    from . import database
+    from awake.database import getGlobalDatabase
 
     #database.setInitial(input)
 
-    input = database.getAll()
+    input = getGlobalDatabase().getAll()
     #input = database.getUnfinished()
 
     input = [address.fromConventional("0000:345B")]
@@ -461,7 +461,7 @@ address.fromConventional("0002:5731"),
         for c in calls:
             callers[c].add(x)
             if c not in procs:
-                database.reportProc(c)
+                getGlobalDatabase().reportProc(c)
                 procs.add(c)
                 to_update.insert(0, c)
 

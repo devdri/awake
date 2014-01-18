@@ -18,6 +18,7 @@ import struct
 
 class Rom(object):
     def __init__(self, filename):
+        self.filename = filename
         with open(filename, 'rb') as f:
             self.data = f.read()
 
@@ -34,3 +35,9 @@ class Rom(object):
         for i in range(length):
             out.append(self.get(addr.offset(i)))
         return out
+
+    def numBanks(self):
+        num = len(self.data) / 0x4000
+        if len(self.data) % 0x4000 or not len(self.data):
+            num += 1
+        return num

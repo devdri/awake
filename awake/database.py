@@ -19,10 +19,8 @@ from . import depend
 from . import address
 import procedure
 
-connection = sqlite3.connect('data/xxx.db')
-
 class ProcInfo(object):
-    def __init__(self, addr, result=None):
+    def __init__(self, connection, addr, result=None):
 
         c = connection.cursor()
         c.execute('select type, depset, has_switch, suspicious_switch, has_suspicious_instr, has_nop, has_ambig_calls, length from procs where addr=?', (str(addr),))
@@ -74,7 +72,7 @@ class ProcInfo(object):
 
         c.close()
 
-    def save(self):
+    def save(self, connection):
         c = connection.cursor()
         c.execute('select addr from procs where addr=?', (str(self.addr),))
         if not c.fetchone():
@@ -101,200 +99,223 @@ class ProcInfo(object):
         from . import operand
         #out += operand.
 
-def init():
-    c = connection.cursor()
-    c.execute('create table if not exists procs(addr text, type text, depset text, has_switch integer, suspicious_switch integer, has_suspicious_instr integer, has_nop integer, has_ambig_calls integer, length integer)')
-    c.execute('create table if not exists calls(source text, destination text, type text)')
-    c.execute('create table if not exists memref(addr text, proc text, type text)')
-    c.close()
-    connection.commit()
+class Database(object):
+    def __init__(self, filename):
+        self.connection = sqlite3.connect(filename)
+        self.init()
 
-def procInfo(addr):
-    return ProcInfo(addr)
+    def init(self):
+        c = self.connection.cursor()
+        c.execute('create table if not exists procs(addr text, type text, depset text, has_switch integer, suspicious_switch integer, has_suspicious_instr integer, has_nop integer, has_ambig_calls integer, length integer)')
+        c.execute('create table if not exists calls(source text, destination text, type text)')
+        c.execute('create table if not exists memref(addr text, proc text, type text)')
+        c.close()
+        self.connection.commit()
 
-def reportProc(addr):
-    procInfo(addr).save()
+    def procInfo(self, addr):
+        return ProcInfo(self.connection, addr)
 
-def getProcByteOwner(byte_addr, ignore_addr=None):
-    c = connection.cursor()
-    c.execute('select addr from procs where addr<=? order by addr desc', (str(byte_addr),))
-    result = c.fetchone()
-    if not result:
-        return None
-    c.close()
+    def reportProc(self, addr):
+        procInfo(self.connection, addr).save(self.connection)
 
-    proc_addr = address.fromConventional(result[0])
+    def getProcByteOwner(self, byte_addr, ignore_addr=None):
+        c = self.connection.cursor()
+        c.execute('select addr from procs where addr<=? order by addr desc', (str(byte_addr),))
+        result = c.fetchone()
+        if not result:
+            return None
+        c.close()
 
-    if proc_addr == ignore_addr:
-        return None
+        proc_addr = address.fromConventional(result[0])
 
-    proc = procedure.at(proc_addr)
+        if proc_addr == ignore_addr:
+            return None
 
-    if byte_addr not in proc.instructions:
-        return None
+        proc = procedure.at(proc_addr)
 
-    return proc_addr
+        if byte_addr not in proc.instructions:
+            return None
 
-def getNextOwnedAddress(addr):
-    c = connection.cursor()
-    c.execute('select addr from procs where addr > ? order by addr', (str(addr),))
-    result = c.fetchone()
-    c.close()
-    if not result:
-        return None
-    return address.fromConventional(result[0])
+        return proc_addr
 
-init()
+    def getNextOwnedAddress(self, addr):
+        c = self.connection.cursor()
+        c.execute('select addr from procs where addr > ? order by addr', (str(addr),))
+        result = c.fetchone()
+        c.close()
+        if not result:
+            return None
+        return address.fromConventional(result[0])
 
-def getUnfinished():
-    c = connection.cursor()
-    c.execute('select addr from procs where has_ambig_calls=1 and suspicious_switch=0 and has_suspicious_instr=0')
-    out = list()
-    for result in c.fetchall():
-        addr = address.fromConventional(result[0])
-        out.append(addr)
-    c.close()
-    return out
+    def getUnfinished(self):
+        c = self.connection.cursor()
+        c.execute('select addr from procs where has_ambig_calls=1 and suspicious_switch=0 and has_suspicious_instr=0')
+        out = list()
+        for result in c.fetchall():
+            addr = address.fromConventional(result[0])
+            out.append(addr)
+        c.close()
+        return out
 
-def getAll():
-    c = connection.cursor()
-    c.execute('select addr from procs order by addr')
-    out = list()
-    for result in c.fetchall():
-        addr = address.fromConventional(result[0])
-        out.append(addr)
-    c.close()
-    return out
+    def getAll(self):
+        c = self.connection.cursor()
+        c.execute('select addr from procs order by addr')
+        out = list()
+        for result in c.fetchall():
+            addr = address.fromConventional(result[0])
+            out.append(addr)
+        c.close()
+        return out
 
-def setInitial(initial):
-    c = connection.cursor()
-    for x in initial:
-        c.execute('insert into calls(source, destination) values ("FFFF:0000", ?)', (str(x),))
-    c.close()
-    connection.commit()
+    def getAllInBank(self, bank):
+        bank_name = "{:04X}".format(bank)
 
-def getInteresting():
-    from . import operand
-    out = '<pre>'
-    c = connection.cursor()
-    c.execute('select addr from procs where has_ambig_calls=1')
-    out += 'ambig calls:\n'
-    for result in c.fetchall():
-        addr = address.fromConventional(result[0])
-        out += '    ' + operand.ProcAddress(addr).html() + '\n'
-    c.execute('select addr from procs where suspicious_switch=1')
-    out += 'suspicious switch:\n'
-    for result in c.fetchall():
-        addr = address.fromConventional(result[0])
-        out += '    ' + operand.ProcAddress(addr).html() + '\n'
-    c.execute('select addr from procs where has_suspicious_instr=1')
-    out += 'suspicious instr:\n'
-    for result in c.fetchall():
-        addr = address.fromConventional(result[0])
-        out += '    ' + operand.ProcAddress(addr).html() + '\n'
-    c.close()
-    out += '</pre>'
-    return out
+        c = self.connection.cursor()
+        c.execute('select addr from procs where substr(addr, 0, 5)=? order by addr', (bank_name,))
+        out = list()
+        for result in c.fetchall():
+            addr = address.fromConventional(result[0])
+            out.append(addr)
+        c.close()
+        return out
 
-def getAmbigCalls():
-    out = set()
-    c = connection.cursor()
-    c.execute('select addr from procs where has_ambig_calls=1')
-    for result in c.fetchall():
-        addr = address.fromConventional(result[0])
-        out.add(addr)
-    return out
+    def setInitial(self, initial):
+        c = self.connection.cursor()
+        for x in initial:
+            c.execute('insert into calls(source, destination) values ("FFFF:0000", ?)', (str(x),))
+        c.close()
+        self.connection.commit()
 
-def getDataReferers(data_addr):
-    reads = set()
-    writes = set()
-    c = connection.cursor()
-    c.execute('select proc, type from memref where addr=?', (str(data_addr),))
-    for result in c.fetchall():
-        addr = address.fromConventional(result[0])
-        if result[1] == 'read':
-            reads.add(addr)
-        else:
-            writes.add(addr)
-    return reads, writes
+    def getInteresting(self):
+        from . import operand
+        out = '<pre>'
+        c = self.connection.cursor()
+        c.execute('select addr from procs where has_ambig_calls=1')
+        out += 'ambig calls:\n'
+        for result in c.fetchall():
+            addr = address.fromConventional(result[0])
+            out += '    ' + operand.ProcAddress(addr).html() + '\n'
+        c.execute('select addr from procs where suspicious_switch=1')
+        out += 'suspicious switch:\n'
+        for result in c.fetchall():
+            addr = address.fromConventional(result[0])
+            out += '    ' + operand.ProcAddress(addr).html() + '\n'
+        c.execute('select addr from procs where has_suspicious_instr=1')
+        out += 'suspicious instr:\n'
+        for result in c.fetchall():
+            addr = address.fromConventional(result[0])
+            out += '    ' + operand.ProcAddress(addr).html() + '\n'
+        c.close()
+        out += '</pre>'
+        return out
 
-def produce_map():
+    def getAmbigCalls(self):
+        out = set()
+        c = self.connection.cursor()
+        c.execute('select addr from procs where has_ambig_calls=1')
+        for result in c.fetchall():
+            addr = address.fromConventional(result[0])
+            out.add(addr)
+        return out
 
-    romsize = 512*1024
-    width = 256
-    height = romsize/width
+    def getDataReferers(self, data_addr):
+        reads = set()
+        writes = set()
+        c = self.connection.cursor()
+        c.execute('select proc, type from memref where addr=?', (str(data_addr),))
+        for result in c.fetchall():
+            addr = address.fromConventional(result[0])
+            if result[1] == 'read':
+                reads.add(addr)
+            else:
+                writes.add(addr)
+        return reads, writes
 
-    import Image
-    img = Image.new('RGB', (width, height))
+    def produce_map(self):
 
-    for i in range(512*1024):
-        addr = address.fromPhysical(i)
-        from . import disasm
-        if addr.bank() in (0x08, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x1C, 0x1D):
-            color = (0, 0, 255)
-        elif addr.bank() == 0x16 and addr.virtual() >= 0x5700:
-            color = (0, 0, 255)
-        elif addr.bank() == 0x09 and addr.virtual() >= 0x6700:
-            color = (0, 0, 255)
-        elif disasm.cur_rom.get(addr) == 0xFF:
-            color = (0, 0, 127)
-        else:
-            color = (0, 0, 0)
-        x = i % width
-        y = i // width
-        img.putpixel((x, y), color)
+        romsize = 512*1024
+        width = 256
+        height = romsize/width
 
-    c = connection.cursor()
-    c.execute('select addr, length from procs order by addr')
-    for result in c.fetchall():
-        addr = address.fromConventional(result[0])
-        length = result[1]
+        import Image
+        img = Image.new('RGB', (width, height))
 
-        for i in range(length):
-            byte_addr = addr.offset(i).physical()
-
-            x = byte_addr % width
-            y = byte_addr // width
-            color = (0, 255, 0)
+        for i in range(512*1024):
+            addr = address.fromPhysical(i)
+            from . import disasm
+            if addr.bank() in (0x08, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x1C, 0x1D):
+                color = (0, 0, 255)
+            elif addr.bank() == 0x16 and addr.virtual() >= 0x5700:
+                color = (0, 0, 255)
+            elif addr.bank() == 0x09 and addr.virtual() >= 0x6700:
+                color = (0, 0, 255)
+            elif disasm.cur_rom.get(addr) == 0xFF:
+                color = (0, 0, 127)
+            else:
+                color = (0, 0, 0)
+            x = i % width
+            y = i // width
             img.putpixel((x, y), color)
 
-    c.close()
+        c = self.connection.cursor()
+        c.execute('select addr, length from procs order by addr')
+        for result in c.fetchall():
+            addr = address.fromConventional(result[0])
+            length = result[1]
 
-    img.save('data/ownership.png')
-    print('image saved')
+            for i in range(length):
+                byte_addr = addr.offset(i).physical()
 
-def bankReport(bank):
-    from . import operand
-    bank_name = "{:04X}".format(bank)
+                x = byte_addr % width
+                y = byte_addr // width
+                color = (0, 255, 0)
+                img.putpixel((x, y), color)
 
-    out = '<pre>'
-    c = connection.cursor()
+        c.close()
 
-    out += 'public interface:\n'
-    c.execute('select destination from calls where substr(source, 0, 5)<>? and substr(destination, 0, 5)=? group by destination order by destination', (bank_name, bank_name))
-    for result in c.fetchall():
-        addr = address.fromConventional(result[0])
-        out += '    ' + operand.ProcAddress(addr).html() + '\n'
+        img.save('data/ownership.png')
+        print('image saved')
 
-    out += 'dependencies:\n'
-    c.execute('select destination from calls where substr(source, 0, 5)=? and substr(destination, 0, 5)<>? group by source order by source', (bank_name, bank_name))
-    for result in c.fetchall():
-        addr = address.fromConventional(result[0])
-        out += '    ' + operand.ProcAddress(addr).html() + '\n'
+    def bankReport(self, bank):
+        from . import operand
+        bank_name = "{:04X}".format(bank)
 
-    out += 'reads:\n'
-    c.execute('select addr from memref where substr(proc, 0, 5)=? and type=? group by addr order by addr', (bank_name, 'read'))
-    for result in c.fetchall():
-        addr = address.fromConventional(result[0])
-        out += '    ' + operand.DataAddress(addr).html() + '\n'
+        out = '<pre>'
+        c = self.connection.cursor()
 
-    out += 'writes:\n'
-    c.execute('select addr from memref where substr(proc, 0, 5)=? and type=? group by addr order by addr', (bank_name, 'write'))
-    for result in c.fetchall():
-        addr = address.fromConventional(result[0])
-        out += '    ' + operand.DataAddress(addr).html() + '\n'
+        out += 'public interface:\n'
+        c.execute('select destination from calls where substr(source, 0, 5)<>? and substr(destination, 0, 5)=? group by destination order by destination', (bank_name, bank_name))
+        for result in c.fetchall():
+            addr = address.fromConventional(result[0])
+            out += '    ' + operand.ProcAddress(addr).html() + '\n'
 
-    c.close()
-    out += '</pre>'
-    return out
+        out += 'dependencies:\n'
+        c.execute('select destination from calls where substr(source, 0, 5)=? and substr(destination, 0, 5)<>? group by source order by source', (bank_name, bank_name))
+        for result in c.fetchall():
+            addr = address.fromConventional(result[0])
+            out += '    ' + operand.ProcAddress(addr).html() + '\n'
 
+        out += 'reads:\n'
+        c.execute('select addr from memref where substr(proc, 0, 5)=? and type=? group by addr order by addr', (bank_name, 'read'))
+        for result in c.fetchall():
+            addr = address.fromConventional(result[0])
+            out += '    ' + operand.DataAddress(addr).html() + '\n'
+
+        out += 'writes:\n'
+        c.execute('select addr from memref where substr(proc, 0, 5)=? and type=? group by addr order by addr', (bank_name, 'write'))
+        for result in c.fetchall():
+            addr = address.fromConventional(result[0])
+            out += '    ' + operand.DataAddress(addr).html() + '\n'
+
+        c.close()
+        out += '</pre>'
+        return out
+
+_global_db = None
+
+def getGlobalDatabase():
+    return _global_db
+
+def setGlobalDatabase(db):
+    global _global_db
+    _global_db = db
