@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import regutil
+from . import regutil
 
 def joinDependencies(first, second):
     reads = second.reads - first.writes | first.reads
@@ -44,9 +44,11 @@ class DependencySet:
         return 'DependencySet({0}, {1})'.format(regutil.joinRegisters(self.reads), regutil.joinRegisters(self.writes))
 
 def encode(depset):
-    return ", ".join(regutil.joinRegisters(depset.reads)) + " -> " + ", ".join(regutil.joinRegisters(depset.writes))
+    return ", ".join(str(x) for x in regutil.joinRegisters(depset.reads)) + " -> " + ", ".join(str(x) for x in regutil.joinRegisters(depset.writes))
 
 def decode(text):
+    if not text:
+        return DependencySet()
     r, w = text.split("->")
     reads = set(x.strip() for x in r.split(","))
     writes = set(x.strip() for x in w.split(","))

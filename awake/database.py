@@ -15,8 +15,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import sqlite3
-import depend
-import address
+from . import depend
+from . import address
 import procedure
 
 connection = sqlite3.connect('data/xxx.db')
@@ -98,7 +98,7 @@ class ProcInfo(object):
 
     def html(self):
         out = ''
-        import operand
+        from . import operand
         #out += operand.
 
 def init():
@@ -174,7 +174,7 @@ def setInitial(initial):
     connection.commit()
 
 def getInteresting():
-    import operand
+    from . import operand
     out = '<pre>'
     c = connection.cursor()
     c.execute('select addr from procs where has_ambig_calls=1')
@@ -229,7 +229,7 @@ def produce_map():
 
     for i in range(512*1024):
         addr = address.fromPhysical(i)
-        import disasm
+        from . import disasm
         if addr.bank() in (0x08, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x1C, 0x1D):
             color = (0, 0, 255)
         elif addr.bank() == 0x16 and addr.virtual() >= 0x5700:
@@ -261,4 +261,40 @@ def produce_map():
     c.close()
 
     img.save('data/ownership.png')
-    print 'image saved'
+    print('image saved')
+
+def bankReport(bank):
+    from . import operand
+    bank_name = "{:04X}".format(bank)
+
+    out = '<pre>'
+    c = connection.cursor()
+
+    out += 'public interface:\n'
+    c.execute('select destination from calls where substr(source, 0, 5)<>? and substr(destination, 0, 5)=? group by destination order by destination', (bank_name, bank_name))
+    for result in c.fetchall():
+        addr = address.fromConventional(result[0])
+        out += '    ' + operand.ProcAddress(addr).html() + '\n'
+
+    out += 'dependencies:\n'
+    c.execute('select destination from calls where substr(source, 0, 5)=? and substr(destination, 0, 5)<>? group by source order by source', (bank_name, bank_name))
+    for result in c.fetchall():
+        addr = address.fromConventional(result[0])
+        out += '    ' + operand.ProcAddress(addr).html() + '\n'
+
+    out += 'reads:\n'
+    c.execute('select addr from memref where substr(proc, 0, 5)=? and type=? group by addr order by addr', (bank_name, 'read'))
+    for result in c.fetchall():
+        addr = address.fromConventional(result[0])
+        out += '    ' + operand.DataAddress(addr).html() + '\n'
+
+    out += 'writes:\n'
+    c.execute('select addr from memref where substr(proc, 0, 5)=? and type=? group by addr order by addr', (bank_name, 'write'))
+    for result in c.fetchall():
+        addr = address.fromConventional(result[0])
+        out += '    ' + operand.DataAddress(addr).html() + '\n'
+
+    c.close()
+    out += '</pre>'
+    return out
+

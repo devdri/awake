@@ -14,13 +14,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import database
-import disasm
-import address
-import html
-import instruction
-import operand
-import tag
+from . import database
+from . import disasm
+from . import address
+from . import html
+from . import instruction
+from . import operand
+from . import tag
 from collections import defaultdict
 
 def manualJumptableLimit(addr):
@@ -73,12 +73,15 @@ def manualJumptableLimit(addr):
     elif addr == address.fromConventional("0005:7210"):
         return 5
 
+    # AGES
+    elif addr == address.fromConventional("0007:5E96"):
+        return 7
+
     # BIG SWITCH: bad 0003:5A35
 
 class ProcedureRangeAnalysis(object):
 
     def __init__(self, addr, limit):
-        print 'proc range', addr, limit
         self.start_addr = addr
         self.limit_addr = limit
         self.visited = set()
@@ -106,15 +109,15 @@ class ProcedureRangeAnalysis(object):
 
     def ownByte(self, addr):
         if not self.isAvailableAddr(addr):
-            print 'byte not available', addr, 'visited:', ', '.join(str(x) for x in self.visited)
-            print "LOG:", "\n".join(self.log)
+            print('byte not available', addr, 'visited:', ', '.join(str(x) for x in self.visited))
+            print("LOG:", "\n".join(self.log))
         assert self.isAvailableAddr(addr)
         self.owned_bytes.add(addr)
 
     def ownByteRange(self, addr, size):
         for i in range(size):
             if not self.isLocalAddr(addr.offset(i)):
-                print 'megawarn: overlap instr', addr, addr.offset(i)
+                print('megawarn: overlap instr', addr, addr.offset(i))
                 self.warn = True
                 return
             self.ownByte(addr.offset(i))
@@ -123,7 +126,7 @@ class ProcedureRangeAnalysis(object):
 
         manual_limit = manualJumptableLimit(jumptable_addr)
         if manual_limit and self.jumptable_sizes[jumptable_addr] >= manual_limit:
-            print "INFO: manual jumptable limit", jumptable_addr
+            print("INFO: manual jumptable limit", jumptable_addr)
             self.suspicious_switch = True
             return
 
@@ -137,7 +140,7 @@ class ProcedureRangeAnalysis(object):
 
         if not manual_limit:
             if not next_target.inPhysicalMem() or next_target.virtual() <= 0x4A:
-                print 'WARN: jumptable at', jumptable_addr, 'bounded by bad addr', next_target
+                print('WARN: jumptable at', str(jumptable_addr), 'bounded by bad addr', str(next_target))
                 self.suspicious_switch = True
                 return
 
@@ -157,7 +160,7 @@ class ProcedureRangeAnalysis(object):
             return
 
         if not self.isAvailableAddr(addr):
-            print 'ERROR: conflict at addr', addr, 'owned_bytes:', ', '.join(str(x) for x in self.owned_bytes), 'visited:', ', '.join(str(x) for x in self.visited)
+            print('ERROR: conflict at addr', addr, 'owned_bytes:', ', '.join(str(x) for x in self.owned_bytes), 'visited:', ', '.join(str(x) for x in self.visited))
 
         self.visited.add(addr)
 
@@ -169,8 +172,8 @@ class ProcedureRangeAnalysis(object):
             length = next_addr.virtual() - addr.virtual()
             self.ownByteRange(addr, length)
         else:  # XXX
-            print 'WARN: probably bad', addr
-            print "LOG:" + "\n".join(self.log)
+            print('WARN: probably bad', addr)
+            print("LOG:" + "\n".join(self.log))
             raise "bla"
             self.ownByte(addr)
 
@@ -210,16 +213,16 @@ class ProcedureRangeAnalysis(object):
     def shrinkLimitAndCut(self, limit_addr):
         self.limit_addr = limit_addr
         #self.owned_bytes = set(addr for addr in self.owned_bytes if self.isLocalAddr(addr))
-        self.owned_bytes = filter(self.isLocalAddr, self.owned_bytes)
+        self.owned_bytes = list(filter(self.isLocalAddr, self.owned_bytes))
         self.visited = set(addr for addr in self.visited if self.isLocalAddr(addr))
         self.labels = set(addr for addr in self.labels if self.isLocalAddr(addr))
         self.block_starts = set(addr for addr in self.block_starts if self.isLocalAddr(addr))
-        self.jumptable_sizes = dict((k, v) for (k, v) in self.jumptable_sizes.iteritems() if self.isLocalAddr(k))
+        self.jumptable_sizes = dict((k, v) for (k, v) in self.jumptable_sizes.items() if self.isLocalAddr(k))
 
     def html(self):
         out = '<h1>Procedure {0}</h1>\n'.format(tag.nameForAddress(self.start_addr));
         out += '<pre class="disasm">';
-        import disasm
+        from . import disasm
         for addr in sorted(self.visited):
             if addr in self.labels:
                 out += html.label(addr)
@@ -246,7 +249,6 @@ def getLimit(addr):
 
 class ProcedureGraph(object):
     def __init__(self, start_addr, end_addr, block_starts, jumptable_sizes):
-        print 'proc graph', start_addr, end_addr
         self.start_addr = start_addr
         self.end_addr = end_addr
         self.jumptable_sizes = jumptable_sizes
@@ -276,7 +278,7 @@ class ProcedureGraph(object):
 
         instr = instruction.TailCall(operand.ProcAddress(addr))
 
-        from flowcontrol import Block
+        from .flowcontrol import Block
         self.blocks.append(Block([instr]))
 
         self.block_starts.append(addr)
@@ -317,7 +319,7 @@ class ProcedureGraph(object):
         if remove_last:
             instructions = instructions[:-1]
 
-        from flowcontrol import Block
+        from .flowcontrol import Block
         block = Block(instructions)
         self.blocks[pos] = block
 

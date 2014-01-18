@@ -14,9 +14,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import address
-import regutil
-import html
+from . import address
+from . import regutil
+from . import html
 
 class Operand(object):
     bits = 8
@@ -47,11 +47,11 @@ class Operand(object):
         return False
 
     def getMemreads(self):
-        return set()
+        return set(dep for dep in self.getDependencies() if isinstance(dep, address.Address))
 
 class Constant(Operand):
     def __init__(self, value):
-        assert isinstance(value, (long, int))
+        assert isinstance(value, int)
         self.value = value
 
     def __str__(self):
@@ -62,8 +62,14 @@ class Constant(Operand):
     def html(self):
         return html.span(self, 'constant')
 
+    def __hash__(self):
+        return hash(self.value)
+
     def __eq__(self, other):
-        return self.value == other.value
+        try:
+            return self.value == other.value
+        except AttributeError:
+            return False
 
     @property
     def bits(self):
@@ -87,7 +93,7 @@ class ComplexValue(Operand):
         return self.deps
 
     def __str__(self):
-        return '#'+self.hint+':'+(','.join(regutil.joinRegisters(self.deps)))+'#'
+        return '#'+self.hint+':'+(','.join(str(dep) for dep in self.deps if not isinstance(dep, address.Address)))+'#'
 
 
 class AddressConstant(Constant):
@@ -149,6 +155,9 @@ class Register(Operand):
     def getDependencies(self):
         return regutil.splitRegister(self.name)
 
+    def __hash__(self):
+        return hash((Register, self.name))
+
     def __eq__(self, other):
         return isinstance(other, Register) and self.name == other.name
 
@@ -204,13 +213,52 @@ class Dereference(Operand):
         return Dereference(target, self.addr)
 
     def getDependencies(self):
-        return set(['mem']) | self.target.getDependencies()
+        out = set(['mem']) | self.target.getDependencies()
+        if hasattr(self.target, 'getAddress'):
+            out |= set([self.target.getAddress()])
+        return out
+
+    def __hash__(self):
+        return hash((Dereference, self.target))
 
     def __eq__(self, other):
         return isinstance(other, Dereference) and self.target == other.target
 
-    def getMemreads(self):
-        if hasattr(self.target, 'getAddress'):
-            return set([self.target.getAddress()])
-        return set()
+    # XXX
+    #def getMemreads(self):
+    #    if hasattr(self.target, 'getAddress'):
+    #        return set([self.target.getAddress()])
+    #    return set()
 
+
+class ComputedProcAddress(Operand):
+    bits = 24
+
+    def __init__(self, bank, addr):
+        self.bank = bank
+        self.addr = addr
+        self.childs = (self.bank, self.addr)
+
+    def __str__(self):
+        return '[L {0}:{1}]'.format(self.bank, self.addr)
+
+    def html(self):
+        return '[L {0}:{1}]'.format(self.bank.html(), self.addr.html())
+
+    def optimizedWithContext(self, ctx):
+        bank = self.bank.optimizedWithContext(ctx)
+        addr = self.addr.optimizedWithContext(ctx)
+
+        if hasattr(addr, 'value') and addr.value is not None and hasattr(bank, 'value') and bank.value is not None:
+            return ProcAddress(address.fromVirtualAndBank(addr.value, bank.value))
+
+        return ComputedProcAddress(bank, addr)
+
+    def getDependencies(self):
+        return self.addr.getDependencies() | self.bank.getDependencies()
+
+    def __hash__(self):
+        return hash((ComputedProcAddress, self.bank, self.addr))
+
+    def __eq__(self, other):
+        return isinstance(other, ComputedProcAddress) and self.addr == other.addr and self.bank == other.bank

@@ -15,12 +15,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import unittest
-from context import Context
-import address
-import operand
-import placeholders
-import instruction
-import regutil
+from .context import Context
+from . import address
+from . import operand
+from . import placeholders
+from . import instruction
+from . import regutil
 
 class Test(unittest.TestCase):
 

@@ -64,10 +64,10 @@ def setNameForAddress(addr, name):
     c = connection.cursor()
     c.execute('select name from tags where addr=?', (str(addr),))
     if c.fetchone():
-        print 'updating'
+        print('updating')
         c.execute('update tags set name=? where addr=?', (name, str(addr)))
     else:
-        print 'new'
+        print('new')
         c.execute('insert into tags (addr, name) values (?, ?)', (str(addr), name))
     c.close()
     connection.commit()

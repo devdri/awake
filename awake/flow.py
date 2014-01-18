@@ -15,15 +15,15 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from collections import defaultdict
-import tag
-import procedure
-import regutil
-import context
-import flowcontrol
-import address
-import depend
-import operand
-import database
+from . import tag
+from awake import procedure
+from . import regutil
+from . import context
+from . import flowcontrol
+from . import address
+from . import depend
+from . import operand
+from . import database
 
 def select_any(x):
     return next(iter(x), None)
@@ -147,13 +147,10 @@ class FlowAnalysis(object):
     def __init__(self, addr, graph):
         self.addr = addr
         self.graph = graph
-        print 'getting cycles'
         self.cycles = find_cycles(self.graph)
-        print 'getting merges'
         self.merges = find_merge_points(self.graph)
         self.labels = dict()
         self._visited = set()
-        print 'done'
 
     def get_unused_cycle(self, x):
         for cycle in self.cycles[x]:
@@ -278,9 +275,6 @@ class FlowAnalysis(object):
     def make_if(self, block, option_a, option_b):
         cond = self.graph.getCondition(block).negated()
         addr = self.graph.getLast(block).addr
-        if not option_a:
-            cond = cond.negated()
-            option_a, option_b = option_b, option_a
 
         if option_a and option_b:
             if option_a.complexity() > option_b.complexity():
@@ -293,6 +287,10 @@ class FlowAnalysis(object):
 
             if not option_a.hasContinue():  # and option_b.hasContinue():
                 return [flowcontrol.If(addr, cond, option_a, None)] + option_b.contents
+
+        if not option_a:
+            cond = cond.negated()
+            option_a, option_b = option_b, option_a
 
         return [flowcontrol.If(addr, cond, option_a, option_b)]
 
@@ -404,7 +402,7 @@ class ProcedureFlow(object):
             x.addToIndex(index)
 
 def update_info(proc):
-    print 'Updating info for', proc.addr
+    print('Updating info for', proc.addr)
     info = database.procInfo(proc.addr)
     info.depset = proc.getDependencySet()
     info.has_switch = proc.has_switch

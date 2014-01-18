@@ -15,12 +15,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from collections import defaultdict
-import instruction
-import operand
-import placeholders
-import opcodeeffect
-import context
-import expression
+from . import instruction
+from . import operand
+from . import placeholders
+from . import opcodeeffect
+from . import context
+from . import expression
 
 def fillOperand(text, params, argument, next_addr):
     e = expression.parse(text)

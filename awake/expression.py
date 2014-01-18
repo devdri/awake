@@ -14,10 +14,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import operator
+from . import operator
 import shlex
 import re
-import operand
+from . import operand
 
 class ExpressionError(Exception):
     def __init__(self, msg):
@@ -141,4 +141,4 @@ def parse(text):
         lexer.wordchars += '#'
         return expression(lexer)
     except ExpressionError as e:
-        print 'ERROR:', e.msg, 'in', text
+        print('ERROR:', e.msg, 'in', text)

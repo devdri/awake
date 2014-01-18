@@ -15,8 +15,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import unittest
-from singledecoder import SingleOpcodeDecoder
-import address
+from .singledecoder import SingleOpcodeDecoder
+from . import address
 
 class Test(unittest.TestCase):
 

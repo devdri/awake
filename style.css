@@ -1,16 +1,34 @@
 
-.disasm {
+body {
+	background-color: white;
+	color: black;
+}
+
+input {
+	ba//ckground: black;
+	c//olor: white;
+	border: none;
+}
+
+*, h1, .disasm {
 	font-family: monospace;
 }
 
+h1 {
+	font-size: 8pt;
+}
+
+*, .disasm {
+	font-size: 8pt;
+}
+
 .op-addr {
-	color: #888888;
-	width: 8em;
+	color: #444444;
+	width: 50px;
 }
 
 .op-name {
 	color: #000080;
-	width: 4em;
 }
 
 .op-signature {

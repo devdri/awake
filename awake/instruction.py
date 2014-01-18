@@ -14,14 +14,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import jumptable
-import regutil
-import placeholders
-import operand
-import address
-import html
-import depend
-import database
+from . import jumptable
+from . import regutil
+from . import placeholders
+from . import operand
+from . import address
+from . import html
+from . import depend
+from . import database
+from . import expression
 
 class Instruction(object):
     def __init__(self, name, addr=None):
@@ -129,21 +130,14 @@ class ExpressionOp(BaseOp):
         for w in self._loads:
             name = w[0]
             value = w[1]
-            if name.startswith('[') and name.endswith(']'):
-                target = operand.Dereference(operand.Register(name[1:-1]))
-                writes -= set([name])
-            else:
-                target = operand.Register(name)
-                writes -= regutil.splitRegister(name)
+            target = expression.parse(name)
+            writes -= regutil.splitRegisters(target.getDependencies())
             instr = LoadInstruction('LD_'+self.name, target, value, self.addr)
             out.append(instr)
 
         for w in writes:
             value = operand.ComplexValue(self.name, self.getDependencySet().reads)
-            if w.startswith('[') and w.endswith(']'):
-                target = operand.Dereference(operand.Register(w[1:-1]))
-            else:
-                target = operand.Register(w)
+            target = expression.parse(w)
             instr = LoadInstruction('LD_'+self.name, target, value, self.addr)
             out.append(instr)
 
@@ -176,14 +170,18 @@ class BadOpcode(Instruction):
         return False
 
 class JumpInstruction(Instruction):
-    def __init__(self, name, target, cond, addr):
+    def __init__(self, name, target, cond, addr, reads, writes):
         super(JumpInstruction, self).__init__(name, addr)
 
+        self._reads = reads
+        self._writes = writes
+
         self.cond = cond
+
         if hasattr(target, 'getAddress'):
             self.targetAddr = target.getAddress()
             self.target = target
-        if target.value is not None:
+        elif target.value is not None:
             self.targetAddr = address.fromVirtualAndCurrent(target.value, addr)
             self.target = operand.ProcAddress(self.targetAddr)
         else:
@@ -191,16 +189,19 @@ class JumpInstruction(Instruction):
             self.target = target
 
     def optimizedWithContext(self, ctx):
-        return JumpInstruction(self.name, self.target.optimizedWithContext(ctx), self.cond, self.addr)
+        return JumpInstruction(self.name, self.target.optimizedWithContext(ctx), self.cond, self.addr, self._reads, self._writes)
 
     def getDependencies(self, needed):
-        return needed
+        return (needed - self._writes) | self._reads
 
     def getDependencySet(self):
-        return depend.DependencySet()
+        return depend.DependencySet(self._reads, self._writes)
 
     def hasContinue(self):
-        return not hasattr(self.cond, 'alwaysTrue') or not self.cond.alwaysTrue()
+        try:
+            return not self.cond.alwaysTrue()
+        except AttributeError:
+            return True
 
     def jumps(self):
         if self.targetAddr and not self.targetAddr.isAmbiguous():
@@ -225,12 +226,28 @@ class CallInstruction(Instruction):
     def __init__(self, name, target, cond, addr):
         super(CallInstruction, self).__init__(name, addr)
 
+        # XXX: IDIOM [CALL HL]
+        if hasattr(target, 'value') and target.value == 0x00A0:
+            target = placeholders.HL
+
+        # XXX: IDIOM [CALL BC]
+        if hasattr(target, 'value') and target.value == 0x0CDA:
+            target = placeholders.BC
+
+        # XXX: IDIOM [CALL LONG E:HL]
+        if hasattr(target, 'value') and target.value == 0x008A:
+            target = operand.ComputedProcAddress(placeholders.E, placeholders.HL)
+
         self.cond = cond
         if hasattr(target, 'getAddress'):
             self.targetAddr = target.getAddress()
-        else:
+            self.target = operand.ProcAddress(self.targetAddr)
+        elif hasattr(target, 'value') and target.value is not None:
             self.targetAddr = address.fromVirtualAndCurrent(target.value, addr)
-        self.target = operand.ProcAddress(self.targetAddr)
+            self.target = operand.ProcAddress(self.targetAddr)
+        else:
+            self.targetAddr = address.fromVirtual(0x4000)  # XXX: ambiguous address
+            self.target = target
 
         self.returns_used = regutil.ALL_REGS
         self.constant_params = dict()
@@ -257,8 +274,11 @@ class CallInstruction(Instruction):
         self.target = self.target.optimizedWithContext(ctx)
         if hasattr(self.target, 'getAddress'):
             self.targetAddr = self.target.getAddress()
-        else:
+        elif hasattr(self.target, 'value') and self.target.value is not None:
             self.targetAddr = address.fromVirtualAndCurrent(self.target.value, self.addr)
+            self.target = operand.ProcAddress(self.targetAddr)
+        else:
+            pass  # XXX
 
         deps = self.getDependencySet()
 
@@ -438,10 +458,10 @@ class LoadInstruction(ExpressionOp):
             # Detect bank switching -- replace target with ROMBANK register
             if hasattr(target.target, 'getAddress'):
                 addr = target.target.getAddress()
-                if addr.virtual() == 0x2100:
+                if 0x2000 <= addr.virtual() < 0x4000:
                     target = placeholders.ROMBANK
 
-            if target != placeholders.ROMBANK:
+            if hasattr(target, 'target'):
                 ctx.setValueComplex('mem')
 
         if hasattr(target, 'name'):
@@ -460,26 +480,29 @@ class LoadInstruction(ExpressionOp):
     def getMemreads(self):
         out = set()
         out |= self.source.getMemreads()
-        if hasattr(self.target, 'target'):
+        try:
             out |= self.target.target.getMemreads()
+        except AttributeError:
+            pass
         return out
 
     def getMemwrites(self):
-        if hasattr(self.target, 'target'):
-            if hasattr(self.target.target, 'getAddress'):
-                return set([self.target.target.getAddress()])
-        return set()
+        try:
+            return set([self.target.target.getAddress()])
+        except AttributeError:
+            return set()
 
 
 def make(name, operands, addr, reads, writes, values, loads):
-    if name == "JP" and len(operands) == 1:
-        return JumpInstruction(name, operands[0], placeholders.ALWAYS, addr)
+    if (name == "JP" or name == "JR") and len(operands) == 1:
+        return JumpInstruction(name, operands[0], placeholders.ALWAYS, addr, reads, writes)
 
-    elif name == "JP" and len(operands) == 2:
-        return JumpInstruction(name, operands[0], operands[1], addr)
+    elif (name == "JP" or name == "JR") and len(operands) == 2:
+        return JumpInstruction(name, operands[0], operands[1], addr, reads, writes)
 
     elif name == "CALL" and len(operands) == 1:
 
+        # XXX IDIOM
         if operands[0].value == 0:
             return SwitchInstruction(addr)
 
@@ -496,9 +519,5 @@ def make(name, operands, addr, reads, writes, values, loads):
 
     elif name in ("LD", "LD16"):
         return LoadInstruction(name, operands[0], operands[1], addr)
-
-    elif name in ("XOR"):
-        if operands[0] == operands[1]:
-            return LoadInstruction("LD", operands[0], operand.Constant(0), addr)
 
     return ExpressionOp(name, operands, addr, reads, writes, values, loads)

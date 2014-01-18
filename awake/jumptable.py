@@ -14,8 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import operand
-import address
+from . import operand
+from . import address
 
 class JumpTable(object):
     def __init__(self, addr):
@@ -23,7 +23,7 @@ class JumpTable(object):
 
         self.targets = []
 
-        import disasm
+        from . import disasm
         rom = disasm.cur_rom
 
         for i in range(256):

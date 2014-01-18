@@ -14,8 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import singledecoder
-import instruction
+from . import singledecoder
+from . import instruction
 
 class OpcodeDispatcher(object):
 
@@ -34,7 +34,7 @@ class OpcodeDispatcher(object):
     def decode(self, rom, addr):
         entry = rom.get(addr)
         if entry not in self.dispatchTable:
-            print 'WARN: bad opcode', addr
+            print('WARN: bad opcode', addr)
             return instruction.BadOpcode([entry], addr), None
         decoder = self.dispatchTable[entry]
         opcodes = rom.read(addr, decoder.length())

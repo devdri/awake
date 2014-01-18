@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import tag
+from . import tag
 
 def span(contents, klass):
     return '<span class="{1}">{0}</span>'.format(contents, klass)

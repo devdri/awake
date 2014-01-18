@@ -14,15 +14,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import operand
+from . import operand
 
 class Operator(operand.Operand):
 
     def __init__(self, *args):
         self.childs = args
 
-    def getMemreads(self):
-        return set.union(set(), *(ch.getMemreads() for ch in self.childs))
+    # XXX
+    #def getMemreads(self):
+    #    return set.union(set(), *(ch.getMemreads() for ch in self.childs))
 
     def optimizedWithContext(self, ctx):
         childs = (ch.optimizedWithContext(ctx) for ch in self.childs)
@@ -55,10 +56,14 @@ class BinOp(Operator):
 
         return '{0} {1} {2}'.format(left, self.symbol, right)
 
+    def __hash__(self):
+        return hash((self.symbol, self.left, self.right))
+
     def __eq__(self, other):
-        if not hasattr(other, 'symbol') or not hasattr(other, 'left') or not hasattr(other, 'right'):
+        try:
+            return self.symbol == other.symbol and self.left == other.left and self.right == other.right
+        except AttributeError:
             return False
-        return self.symbol == other.symbol and self.left == other.left and self.right == other.right
 
     def html(self):
         left = self.left.html()
@@ -74,7 +79,6 @@ class BinOp(Operator):
 
     @classmethod
     def make(cls, left, right):
-        assert hasattr(cls, 'calculate')
         if isConstant(left) and isConstant(right):
             return operand.Constant(cls.calculate(left.value, right.value))
         else:
@@ -89,12 +93,14 @@ class Add(BinOp):
 
     @classmethod
     def make(cls, left, right):
-        if left.value == 0:
-            return right
+        if isConstant(left):
+            left, right = right, left
         if right.value == 0:
             return left
         if left == right:
             return Shl.make(left, operand.Constant(1))
+        if isinstance(left, Sub) and isConstant(left.right):
+            return Add.make(left.left, operand.Constant(Sub.calculate(right.value, left.right.value)))
         return super(Add, cls).make(left, right)
 
 class Sub(BinOp):
@@ -103,6 +109,18 @@ class Sub(BinOp):
     @staticmethod
     def calculate(left, right):
         return (left - right) & 0xFF
+
+    @classmethod
+    def make(cls, left, right):
+        if isConstant(left):
+            left, right = right, left
+        if right.value == 0:
+            return left
+        if left == right:
+            return operand.Constant(0)
+        if isinstance(left, Sub) and isConstant(left.right):
+            return Sub.make(left.left, operand.Constant(Add.calculate(right.value, left.right.value)))
+        return super(Sub, cls).make(left, right)
 
 class And(BinOp):
     symbol = '&'
@@ -145,6 +163,9 @@ class Or(BinOp):
         if isConstant(left):
             left, right = right, left
 
+        if left == right:
+            return left
+
         if right.value == 0:
             return left
         if isinstance(left, And) and isinstance(right, And):
@@ -169,6 +190,14 @@ class Equals(BinOp):
 
     def logicalNot(self):
         return NotEquals(self.left, self.right)
+
+    @classmethod
+    def make(cls, left, right):
+        if isConstant(left):
+            left, right = right, left
+        if isinstance(left, Sub) and isConstant(left.right) and isConstant(right):
+            return Equals.make(left.left, operand.Constant(Add.calculate(right.value, left.right.value)))
+        return super(Equals, cls).make(left, right)
 
 class NotEquals(BinOp):
     symbol = '!='
@@ -212,8 +241,6 @@ class Shl(BinOp):
 
     @classmethod
     def make(cls, left, right):
-        if isConstant(left):
-            left, right = right, left
 
         if isConstant(right):
 
@@ -255,8 +282,6 @@ class Shr(BinOp):
 
     @classmethod
     def make(cls, left, right):
-        if isConstant(left):
-            left, right = right, left
 
         if isConstant(right):
 
@@ -297,9 +322,10 @@ class LogicalNot(Operator):
 
     @classmethod
     def make(cls, inner):
-        if hasattr(inner, 'logicalNot'):
+        try:
             return inner.logicalNot()
-        return super(LogicalNot, cls).make(inner)
+        except AttributeError:
+            return super(LogicalNot, cls).make(inner)
 
 class Add16(BinOp):
     symbol = '+.'
@@ -352,10 +378,14 @@ class FuncOperator(Operator):
     def html(self):
         return '{0}({1})'.format(self.name, ', '.join(x.html() for x in self.childs))
 
+    def __hash__(self):
+        return hash((self.name, self.args))
+
     def __eq__(self, other):
-        if not hasattr(other, 'name') or not hasattr(other, 'args'):
+        try:
+            return self.name == other.name and self.args == other.args
+        except AttributeError:
             return False
-        return self.name == other.name and self.args == other.args
 
     @classmethod
     def make(cls, *args):
@@ -372,7 +402,7 @@ class PopValue(FuncOperator):
 
     @classmethod
     def make(cls, a):
-        if hasattr(a, 'name') and a.name == 'push':
+        if isinstance(a, Push):
             return a.childs[1]
         return super(PopValue, cls).make(a)
 
@@ -384,7 +414,7 @@ class PopStack(FuncOperator):
 
     @classmethod
     def make(cls, a):
-        if hasattr(a, 'name') and a.name == 'push':
+        if isinstance(a, Push):
             return a.childs[0]
         return super(PopStack, cls).make(a)
 

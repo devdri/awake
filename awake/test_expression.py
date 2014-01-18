@@ -15,10 +15,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import unittest
-import operand
-import operator
-import context
-import expression
+from . import operand
+from . import operator
+from . import context
+from . import expression
 
 class Test(unittest.TestCase):
 

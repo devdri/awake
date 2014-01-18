@@ -15,9 +15,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from collections import defaultdict
-import tag
-import Image
-import address
+from . import tag
+from PIL import Image
+from . import address
 
 def addr_symbol(addr):
     return 'A' + str(addr).replace(':', '_')
@@ -28,7 +28,7 @@ def save_dot(procs):
         for addr in procs:
             tags = ''
 
-            import database
+            from . import database
             info = database.procInfo(addr)
 
             if info.has_switch:
@@ -68,7 +68,60 @@ def save_dot(procs):
 
             for c in info.calls:
                 f.write('    ' + addr_symbol(addr) + ' -> ' + addr_symbol(c) + ';\n')
+            for c in info.tail_calls:
+                f.write('    ' + addr_symbol(addr) + ' -> ' + addr_symbol(c) + ' [color="blue"];\n'
+)
+        f.write("}\n")
 
+def save_dot_for_bank(bank):
+    bank_name = '{:04X}'.format(bank)
+
+    with open('data/bank'+bank_name+'.dot', 'w') as f:
+        f.write("digraph crossref {\n")
+
+        from . import database
+        cur = database.connection.cursor()
+        cur.execute('select addr from procs where substr(addr, 0, 5)=?', (bank_name,))
+        for proc_result in cur.fetchall():
+            addr = address.fromConventional(proc_result[0])
+            tags = ''
+
+            from . import database
+            info = database.procInfo(addr)
+
+            is_public = False
+
+            for c in info.callers:
+                if c.bank() != bank:
+                    is_public = True
+
+            if info.has_switch:
+                tags += ' switch'
+            if info.suspicious_switch:
+                tags += ' suspicious_switch'
+            if info.has_nop:
+                tags += ' nop'
+            if info.has_ambig_calls:
+                tags += ' ambig_calls'
+            if info.has_suspicious_instr:
+                tags += ' suspicious'
+
+            if tags:
+                f.write('    ' + addr_symbol(addr) + ' [color="green"];\n')
+
+            if is_public:
+                tags += ' public'
+
+            f.write('    ' + addr_symbol(addr) + ' [label="' + tag.nameForAddress(addr) + tags + '"];\n')
+            f.write('    ' + addr_symbol(addr) + ' [style="filled"];\n')
+
+            for c in info.calls:
+                if c.bank() == bank:
+                    f.write('    ' + addr_symbol(addr) + ' -> ' + addr_symbol(c) + ';\n')
+            for c in info.tail_calls:
+                if c.bank() == bank:
+                    f.write('    ' + addr_symbol(addr) + ' -> ' + addr_symbol(c) + ' [color="blue"];\n')
+        cur.close()
         f.write("}\n")
 
 def produce_map(ownership):
@@ -86,7 +139,7 @@ def produce_map(ownership):
             addr = address.fromPhysical(j)
             owners |= ownership[addr]
 
-        import disasm
+        from . import disasm
 
         color = (0, 0, 0)
         addr = address.fromPhysical(i*granularity)
@@ -108,14 +161,14 @@ def produce_map(ownership):
         img.putpixel((x, y), color)
 
     img.save('ownership.png')
-    print 'image saved'
+    print('image saved')
 
 
 def getSubgraph(start_points):
     queue = set(start_points)
     verts = set()
 
-    import database
+    from . import database
     while queue:
         x = queue.pop()
         if x in verts:
@@ -379,12 +432,14 @@ address.fromConventional("0002:5DD5"),
 address.fromConventional("0002:5731"),
 ]
 
-    import database
+    from . import database
 
     #database.setInitial(input)
 
     input = database.getAll()
     #input = database.getUnfinished()
+
+    input = [address.fromConventional("0000:345B")]
 
     procs = set(input)
     callers = defaultdict(set)
@@ -399,27 +454,23 @@ address.fromConventional("0002:5731"),
         #if x.bank() in (0x1E, 0x1F, 0x1B):
         #    continue
 
-        print i, 'updating', x
-
-        import flow
+        from . import flow
         flow.refresh(x)
 
         calls = flow.at(x).calls() | flow.at(x).tailCalls()
         for c in calls:
             callers[c].add(x)
             if c not in procs:
-                #print 'found new proc:', c
                 database.reportProc(c)
-                #procs.add(c)
-                #to_update.insert(0, c)
+                procs.add(c)
+                to_update.insert(0, c)
 
         #affected = set()
         #for c in callers[x]:
         #    if database.procInfo(x).has_ambig_calls:
         #        affected.add(x)
-
         #to_update = list(affected - set(to_update)) + to_update
 
-    print 'saving dot'
+    print('saving dot')
     save_dot(procs)
-    print 'saved dot'
+    print('saved dot')

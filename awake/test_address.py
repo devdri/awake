@@ -34,8 +34,8 @@ class Test(unittest.TestCase):
         self.assertEquals(str(address.fromVirtual(0x2000)), "0000:2000")
         self.assertEquals(str(address.fromVirtual(0x4000)), "(A):4000")
         self.assertEquals(str(address.fromVirtual(0x7FFF)), "(A):7FFF")
-        self.assertEquals(str(address.fromVirtual(0x8000)), "(V):8000")
-        self.assertEquals(str(address.fromVirtual(0xFFFF)), "(V):FFFF")
+        self.assertEquals(str(address.fromVirtual(0x8000)), "VRAM:8000")
+        self.assertEquals(str(address.fromVirtual(0xFFFF)), "IO:FFFF")
 
 
     def testFromVirtualAndCurrent(self):
@@ -47,8 +47,8 @@ class Test(unittest.TestCase):
         self.assertEquals(str(address.fromVirtualAndCurrent(0x4000, current4)), "0004:4000")
         self.assertEquals(str(address.fromVirtualAndCurrent(0x7FFF, current1)), "0001:7FFF")
         self.assertEquals(str(address.fromVirtualAndCurrent(0x7FFF, current4)), "0004:7FFF")
-        self.assertEquals(str(address.fromVirtualAndCurrent(0x8000, current1)), "(V):8000")
-        self.assertEquals(str(address.fromVirtualAndCurrent(0xFFFF, current4)), "(V):FFFF")
+        self.assertEquals(str(address.fromVirtualAndCurrent(0x8000, current1)), "VRAM:8000")
+        self.assertEquals(str(address.fromVirtualAndCurrent(0xFFFF, current4)), "IO:FFFF")
 
 
     def testOffset(self):
@@ -56,19 +56,19 @@ class Test(unittest.TestCase):
         self.assertEquals(str(zero.offset(0)), "0000:0000")
         self.assertEquals(str(zero.offset(0x3FFF)), "0000:3FFF")
         self.assertEquals(str(zero.offset(0x4000)), "(A):4000")
-        self.assertEquals(str(zero.offset(0x8000)), "(V):8000")
+        self.assertEquals(str(zero.offset(0x8000)), "VRAM:8000")
 
         first = address.fromPhysical(0x4000)
         self.assertEquals(str(first.offset(-0x4000)), "0000:0000")
         self.assertEquals(str(first.offset(0)), "0001:4000")
         self.assertEquals(str(first.offset(0x3FFF)), "0001:7FFF")
-        self.assertEquals(str(first.offset(0x4000)), "(V):8000")
+        self.assertEquals(str(first.offset(0x4000)), "VRAM:8000")
 
         high = address.fromVirtual(0x8000)
         self.assertEquals(str(high.offset(-0x8000)), "0000:0000")
         self.assertEquals(str(high.offset(-0x1000)), "(A):7000")
-        self.assertEquals(str(high.offset(0)), "(V):8000")
-        self.assertEquals(str(high.offset(0x0FFF)), "(V):8FFF")
+        self.assertEquals(str(high.offset(0)), "VRAM:8000")
+        self.assertEquals(str(high.offset(0x0FFF)), "VRAM:8FFF")
 
 
     def testConventional(self):

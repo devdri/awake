@@ -14,9 +14,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import operand
-import operator
-import regutil
+from . import operand
+from . import operator
+from . import regutil
 
 def hi(value):
     return operator.HighByte(value)
@@ -43,7 +43,7 @@ class Context:
             self.values[register] = operand.ComplexValue('ctx')
 
     def setValue(self, register, value):
-        assert not isinstance(value, (long, int))  # detect common errors
+        assert not isinstance(value, int)  # detect common errors
 
         if register in ('BC', 'DE', 'HL'):
             self.setValue(register[0], hi(value))
@@ -82,7 +82,10 @@ class Context:
         if register not in self.values:
             return False
         value = self.values[register]
-        return not hasattr(value, 'isComplex') or not value.isComplex()
+        try:
+            return not value.isComplex()
+        except AttributeError:
+            return True
 
     def hasConstantValue(self, register):
         return self.hasValue(register) and self.getValue(register).value is not None

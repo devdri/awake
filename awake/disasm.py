@@ -14,15 +14,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import rom
-import opcodedispatcher
+from . import rom
+from . import opcodedispatcher
 
 main_ops = """
 00011000 3 JP    v8_rel               @ read:            write: sideeffects;
 001FF000 2 JP    v8_rel, #F           @ read: #F         write: sideeffects;
 110FF010 3 JP    v16, #F              @ read: #F         write: sideeffects;
 11000011 4 JP    v16                  @ read:            write: sideeffects;
-11101001 1 JP    HL                   @ read:            write: sideeffects;
+11101001 1 JP    HL                   @ read: HL         write: sideeffects;
 11NNN111 4 CALL  #N                   @ read:            write: sideeffects;
 11001101 6 CALL  v16                  @ read:            write: sideeffects;
 110FF100 3 CALL  v16, #F              @ read: #F         write: sideeffects;

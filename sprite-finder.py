@@ -91,5 +91,5 @@ color_bytes(tiles_width, row, H)
 entropy(tiles_width+row, 64, H)
 
 img.save(cart_name+'.png')
-print 'saved image.'
+print('saved image.')
 

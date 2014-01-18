@@ -14,10 +14,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import regutil
-import placeholders
+from . import regutil
+from . import placeholders
 import re
-import expression
+from . import expression
 
 class OpcodeEffect(object):
     def __init__(self, text):
@@ -57,6 +57,7 @@ class OpcodeEffect(object):
                 assert(len(x) == 2)
                 value = params[x[1]]
                 operand = placeholders.get(x[1], value)
+                # XXX: solution here: just add operand.getDependencies()
                 if hasattr(operand, 'target'):
                     reads.add('mem')
                     reads |= regutil.splitRegister('HL')  # TODO: XXX: bad

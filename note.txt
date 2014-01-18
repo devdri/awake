@@ -1,3 +1,95 @@
+-- ARCH: ---
+
+effect:
+- read-write dict: registers and mem
+	- timestamped memreads/writes? -> doesn't matter right now, it is
+		implementation dependant. Only public api matters now.
+- handle unknown address read/write
+	- just use ambiguous addr
+- what about many memwrites?
+	loop XXX:
+		[FF10] = YYY
+- value propagation
+	- select: only constants / expand expressions
+- unused expression removal
+- extra dependencies - for conditional code
+	- plus for proc signature
+	- could use PC target instead
+
+
+
+effect = Effect((addr, value), BC=value2)
+
+Effect.join(effect1, effect2) -- serial combination of effects
+effect3 = effect1.withContext(effect2) -- effect3 is effect1 with propagated values from effect2
+effect3 = effect1.limitTo(effect2{{{.getDependencies()}}}) -- effect1 with removed values unused in effect2
+
+
+
+address
+rom
+
+database -> depend address procedure
+tag
+html -> tag
+
+###
+	regutil
+	operand -> address regutil html
+	operator -> operand
+	expression -> operator operand
+
+context -> operand operator regutil
+depend (DependencySet) -> regutil
+
+placeholders -> address operand
+opcodeeffect -> regutil placeholders expression
+singledecoder -> instruction operand placeholders opcodeeffect context expression
+opcodedispatcher -> singledecoder instruction
+disasm -> rom opcodedispatcher
+
+graph -> tag address database flow
+
+instruction -> jumptable regutil placeholders operand address html depend database
+jumptable -> operand address disasm
+procedure -> database disasm address html instruction operand tag
+
+flow -> tag procedure regutil context flowcontrol address depend operand database
+flowcontrol -> instruction operand context regutil html depend placeholders address
+
+NOTES:
+- flowcontrol: remove placeholders?
+- operand: regutil could be removed. address except computed and deref
+- operator: could be less specific, but is cool; isConstant() bad
+- placeholders: separate register names from opcode details (or merge placeholders to disasm)
+- procedure: refactor manualJumptableLimit. Maybe rename module because of range-analysis, etc.
+- regutil: could be less specific / moved
+- singledecoder: context used for instruction instantiation
+- flow: analyze - hardcoded hacks
+
+---------------------------------
+
+Instruction, CompoundInstruction
+ -> dependencies, context, etc.
+ -> memreads, memwrites to depset
+ -> split to simple as pass
+ -> remove calls/jumps/hasContinue, use function
+
+specific instructions
+
+decoder -> specific instruction
+flow analyzer -> compound instructions
+
+
+-- AGES / RESUME LOG: --
+
+found microthreads
+initial microthread table
+obtain huge graph
+draw dependencies by bank
+
+
+-- LINKS AWAKENING NOTES FOLLOW: --
 
 sprites in banks: 0x0C -- 0x13
 
@@ -6,6 +98,7 @@ sprites in banks: 0x0C -- 0x13
 select * from calls where not exists (select * from procs where procs.addr=calls.source) and calls.source != "FFFF:0000"
 select * from procs where not exists (select * from calls where procs.addr=calls.destination)
 select * from procs where has_suspicious_instr=1
+select * from memref where addr not like "WORK:%" and addr not like "IO:%" and addr not like "HRAM:%" and addr not like "BATT:%"
 
 0000:0B53:
 	bank remember/restore
@@ -17,6 +110,22 @@ select * from procs where has_suspicious_instr=1
 	crazy stuff:
 	JP ..., FZ
 	RET FNZ
+
+Configurable:
+- rombank shadow in var
+- dma routine mapping (ex. 0xFF80 -> 0001:4BFB)
+- manual entry points
+
+D300 - D410 -- music vars
+D480 -- probably dungeon minimap (refreshed on start menu (in dungeon) and enter dungeon)
+D500 -- map backup below text box
+D600 -- some vars, restored on move screen
+D650 -- stuff restored on enter dungeon
+D6FD -- desired lcdc low
+D700 - D79F -- room data (collision etc.)
+	related procs: 0000:30DC, 0001:7CDE
+DB00 -- equipment, etc.
+DB47 -- seconds counting upwards from some val, stops at FF
 
 TODO:
 - speedup database.
@@ -48,12 +157,40 @@ TODO:
 - better bad-op handling:
 	display page anyway
 - handle elseif chains
+- logical and/or instead of nested ifs
 - better jumptable size heuristics
+- understand loops and make rich instructions
+	memcpy dest, src, size
+	memset dest, val, size, [stride]
+	multiply-add loop
+	dec16 from dec lo, if zero(lo): dec hi
+	copy-word
 
+New idea:
 
+DataAddress(Operand)
+- contains a Constant or sth. else instead of subclassing it
+- manages ROMBANK dependencies etc.
+- probably better place to do optimizations than Dereference
+	doesn't have to mean actual access to data
+	con: doesn't 'serialize' nicely into expression, is just an artificial product of Dereference
+	pro: could be easily used as lvalue
 
+database:
+- check byte ownership, add/remove ownership
 
+procedure:
+- owned bytes
+- easy to add/remove content
 
+- proc references ((tail-)call, ambiguous, known args, etc.)
+- data references (read/write, base addr, size, indexing mode, etc. (maybe also as jumptable))
+- depset, known output
+- user content: name, arg names
+
+jumptable:
+- size, owned bytes
+- canBeExpanded()
 
 dfs:
 - start point
@@ -209,6 +346,7 @@ screen_warp_mode -- 0xC17F:
 6E -- butterfly
 1C -- small zol
 19 -- keese
+5F -- big stalfos (alive status == 4 -> toggle boss talk)
 
-07 -- bad-op? shield-back, more powerful bracelet (get item in general)
+07 -- shield-back, more powerful bracelet (get item in general)
 

@@ -16,25 +16,23 @@
 
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from urlparse import urlparse, parse_qs
-import address
-import flow
-import tag
-import operand
-import jumptable
-import procedure
-import graph
+from . import address
+from awake import flow
+from . import tag
+from . import operand
+from . import jumptable
+from . import procedure
+from . import graph
 from awake import database
 
 def proc_page(addr, out):
-
-    print 'proc page', str(addr)
 
     info = database.procInfo(addr)
     out.write('callers: ' + ', '.join(operand.ProcAddress(x).html() for x in info.callers) + '<br />')
 
     flow.refresh(addr)
     #out += 'deps: ' + str(flow.getProcDepSet(addr)) + '<br />'
-    #out += 'calls: ' + ', '.join(operand.ProcAddress(x).html() for x in flow.at(addr).calls()) + '<br />'
+    out.write('calls: ' + ', '.join(operand.ProcAddress(x).html() for x in flow.at(addr).calls()) + '<br />')
 
 
 
@@ -43,7 +41,6 @@ def proc_page(addr, out):
     out.write(procedure.loadProcedureRange(addr).html())
 
 def data_page(addr):
-    print 'data page', str(addr)
     out = ''
 
     reads, writes = database.getDataReferers(addr)
@@ -60,6 +57,9 @@ def data_page(addr):
 
 def jumptable_page(addr):
     return jumptable.JumpTable(addr).html()
+
+def bank_page(bank):
+    return database.bankReport(bank)
 
 def name_form(addr):
     out = ''
@@ -84,7 +84,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
 
-        print 'get', self.path
+        print('get', self.path)
 
         if self.path.startswith('/proc/'):
 
@@ -126,6 +126,16 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(jumptable_page(addr))
             self.wfile.write("</body></html>")
 
+        elif self.path.startswith('/bank/'):
+
+            p = self.path.split('/')
+
+            self.ok_html()
+            self.wfile.write("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"/style.css\" /></head><body>")
+            bank = int(p[2], 16)
+            self.wfile.write(bank_page(bank))
+            self.wfile.write("</body></html>")
+
         elif self.path == '/style.css':
             self.send_response(200)
             self.send_header('Content-type', 'text/css')
@@ -133,10 +143,17 @@ class Handler(BaseHTTPRequestHandler):
             with open('style.css', 'r') as f:
                 self.wfile.write(f.read())
 
+        elif self.path == '/favicon.ico':
+            self.send_response(200)
+            self.send_header('Content-type', 'image/x-icon')
+            self.end_headers()
+            with open('favicon.ico', 'r') as f:
+                self.wfile.write(f.read())
+
         elif self.path.startswith('/set-name?'):
             q = urlparse(self.path).query
             p = parse_qs(q)
-            print p, q
+            print(p, q)
             addr = address.fromConventional(p['addr'][0])
             name = p['name'][0]
             tag.setNameForAddress(addr, name)
@@ -147,20 +164,24 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
 
 def run():
-    print len(database.getUnfinished()), 'unfinished'
-
     import traceback
     try:
-        print ''
+        print('')
         #start_points = database.getAmbigCalls()
         #graph.save_dot(graph.getSubgraph(start_points))
         #database.produce_map()
+        #print "running search"
         #graph.search()
+        #print "search finished"
+        #graph.save_dot(set(database.getAll()))
+        #for bank in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xC, 0x12, 0x16, 0x39, 0x3F):
+        #    print 'saving dot for bank', bank
+        #    graph.save_dot_for_bank(bank)
     except Exception as e:
-        print traceback.format_exc()
+        print(traceback.format_exc())
 
     #database.produce_map()
 
     server = HTTPServer(('', 8888), Handler)
-    print "Running server..."
+    print("Running server...")
     server.serve_forever()

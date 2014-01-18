@@ -59,7 +59,7 @@ def fromConventional(conventional):
         halves = conventional.split(":", 2)
         virtual = int(halves[1], 16)
 
-        if virtual >= 0x8000 or halves[0] == '(A)':
+        if virtual < 0x4000 or virtual >= 0x8000 or halves[0] == '(A)':
             return fromVirtual(virtual)
 
         bank = int(halves[0], 16)
@@ -120,9 +120,10 @@ class Address(object):
         return self.address < other.address
 
     def __eq__(self, other):
-        if not hasattr(other, 'address'):
+        try:
+            return self.address == other.address
+        except AttributeError:
             return False
-        return self.address == other.address
 
     def __ne__(self, other):
         return not self.__eq__(other)

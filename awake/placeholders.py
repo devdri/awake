@@ -14,9 +14,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import address
-import operand
-from operand import Register, Condition, Dereference
+from . import address
+from . import operand
+from .operand import Register, Condition, Dereference
 
 BC = Register("BC")
 DE = Register("DE")
