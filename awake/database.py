@@ -112,6 +112,9 @@ class Database(object):
         c.close()
         self.connection.commit()
 
+    def close(self):
+        self.connection.close()
+
     def procInfo(self, addr):
         return ProcInfo(self.connection, addr)
 

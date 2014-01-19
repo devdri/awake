@@ -46,6 +46,9 @@ class TagDB(object):
         c.close()
         self.connection.commit()
 
+    def close(self):
+        self.connection.close()
+
     def hasNameForAddress(self, addr):
         if str(addr) in defaults:
             return True
