@@ -15,13 +15,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from collections import defaultdict
-from awake import procedure
-from . import regutil
-from . import context
-from . import flowcontrol
-from . import address
-from . import depend
-from . import operand
+from awake import address, flowcontrol, procedure
+from awake.context import Context
+from awake.depend import DependencySet
+from awake.operand import Constant
+from awake.regutil import ALL_REGS
 
 def select_any(x):
     return next(iter(x), None)
@@ -305,23 +303,23 @@ class FlowAnalysis(object):
 
     def analyze(self):
 
-        ctx = context.Context()
+        ctx = Context()
 
         if self.addr.virtual() == 0x0A90:
-            ctx.setValue('ROMBANK', operand.Constant(1))
+            ctx.setValue('ROMBANK', Constant(1))
         if self.addr.virtual() == 0x3CCA:
-            ctx.setValue('ROMBANK', operand.Constant(0x15))
+            ctx.setValue('ROMBANK', Constant(0x15))
         if self.addr.virtual() in (0x0B34, 0x0B37, 0x0B3A, 0x0B3D):
-            ctx.setValue('ROMBANK', operand.Constant(1))
+            ctx.setValue('ROMBANK', Constant(1))
         if self.addr.virtual() in (0x0D68, 0x0E7F, 0x0EFC, 0x0EDB, 0x0C40, 0x149B, 0x15B3, 0x1732, 0x0C10):
-            ctx.setValue('ROMBANK', operand.Constant(2))
+            ctx.setValue('ROMBANK', Constant(2))
 
         if self.addr.inBankedSpace() and not self.addr.isAmbiguous():
-            ctx.setValue('ROMBANK', operand.Constant(self.addr.bank()))
+            ctx.setValue('ROMBANK', Constant(self.addr.bank()))
 
         content = self.process(self.graph.start(), None, False, False, True)
         content = content.optimizedWithContext(ctx)
-        content = content.optimizeDependencies(set(regutil.ALL_REGS) - set(['FZ', 'FN', 'FC', 'FH']))
+        content = content.optimizeDependencies(set(ALL_REGS) - set(['FZ', 'FN', 'FC', 'FH']))
         return content
 
 class ProcedureFlow(object):
@@ -375,7 +373,7 @@ class ProcedureFlow(object):
             #        self._computedJumps = True
 
     def getDependencySet(self):
-        return depend.DependencySet(self.deps.reads - set(['FZ', 'FN', 'FC', 'FH']), self.deps.writes)
+        return DependencySet(self.deps.reads - set(['FZ', 'FN', 'FC', 'FH']), self.deps.writes)
 
     def getInstructions(self):
         out = set()

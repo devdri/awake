@@ -14,18 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from . import operand
-from . import operator
-from . import regutil
-
-def hi(value):
-    return operator.HighByte(value)
-
-def lo(value):
-    return operator.LowByte(value)
-
-def word(h, l):
-    return operator.Word(h, l)
+from awake.operand import ComplexValue
+from awake.operator import HighByte, LowByte, Word, LogicalNot
 
 class Context:
     def __init__(self, values=None):
@@ -40,16 +30,16 @@ class Context:
             self.setValueComplex(register[1])
         else:
             self.invalidate(register)
-            self.values[register] = operand.ComplexValue('ctx')
+            self.values[register] = ComplexValue('ctx')
 
     def setValue(self, register, value):
         assert not isinstance(value, int)  # detect common errors
 
         if register in ('BC', 'DE', 'HL'):
-            self.setValue(register[0], hi(value))
-            self.setValue(register[1], lo(value))
+            self.setValue(register[0], HighByte(value))
+            self.setValue(register[1], LowByte(value))
         elif register == 'AF':
-            self.setValue('A', hi(value))
+            self.setValue('A', HighByte(value))
             self.setValueComplex('FZ')
             self.setValueComplex('FC')
             self.setValueComplex('FN')
@@ -92,11 +82,11 @@ class Context:
 
     def getValue(self, register):
         if register in ('BC', 'DE', 'HL'):
-            return word(self.getValue(register[0]), self.getValue(register[1])).optimizedWithContext(Context())
+            return Word(self.getValue(register[0]), self.getValue(register[1])).optimizedWithContext(Context())
         if register == 'FNZ':
-            return operator.LogicalNot(self.getValue('FZ')).optimizedWithContext(Context())
+            return LogicalNot(self.getValue('FZ')).optimizedWithContext(Context())
         if register == 'FNC':
-            return operator.LogicalNot(self.getValue('FC')).optimizedWithContext(Context())
+            return LogicalNot(self.getValue('FC')).optimizedWithContext(Context())
         else:
             return self.values[register].optimizedWithContext(Context())
 
@@ -111,5 +101,3 @@ class Context:
 
     def clone(self):
         return Context(self.values)
-
-

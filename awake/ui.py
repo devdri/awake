@@ -16,13 +16,12 @@
 
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from urlparse import urlparse, parse_qs
-from . import address
-from . import operand
-from . import jumptable
-from . import procedure
-from . import graph
-from awake.textrenderer import HtmlRenderer
+from awake import address
+from awake.jumptable import JumpTable
+from awake.operand import ProcAddress
+from awake.procedure import loadProcedureRange
 from awake.project import Project
+from awake.textrenderer import HtmlRenderer
 
 def proc_page(addr, out, server):
 
@@ -31,19 +30,19 @@ def proc_page(addr, out, server):
     renderer = HtmlRenderer(server.proj.database)
 
     renderer.add('callers: ')
-    renderer.renderList(operand.ProcAddress(x) for x in info.callers)
+    renderer.renderList(ProcAddress(x) for x in info.callers)
     renderer.newline()
 
     server.proj.flow.refresh(addr)
     #out += 'deps: ' + str(flow.getProcDepSet(addr)) + '<br />'
 
     renderer.add('calls: ')
-    renderer.renderList(operand.ProcAddress(x) for x in server.proj.flow.at(addr).calls())
+    renderer.renderList(ProcAddress(x) for x in server.proj.flow.at(addr).calls())
     renderer.newline()
 
     server.proj.flow.at(addr).render(renderer)
 
-    procedure.loadProcedureRange(server.proj, addr).render(renderer, server.proj)
+    loadProcedureRange(server.proj, addr).render(renderer, server.proj)
 
     out.write(renderer.getContents())
 
@@ -57,11 +56,11 @@ def data_page(addr, server):
     renderer.addLegacy('<pre>\n')
     renderer.addLegacy('reads:\n')
     for x in reads:
-        operand.ProcAddress(x).render(renderer)
+        ProcAddress(x).render(renderer)
         renderer.newline()
     renderer.addLegacy('writes:\n')
     for x in writes:
-        operand.ProcAddress(x).render(renderer)
+        ProcAddress(x).render(renderer)
         renderer.newline()
     renderer.addLegacy('</pre>\n')
 
@@ -69,7 +68,7 @@ def data_page(addr, server):
 
 def jumptable_page(addr, server):
     renderer = HtmlRenderer(server.proj.database)
-    jumptable.JumpTable(addr).render(renderer)
+    JumpTable(addr).render(renderer)
     return renderer.getContents()
 
 def bank_page(bank, server):

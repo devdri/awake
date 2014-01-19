@@ -14,8 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from . import operand
-from . import address
+from awake import address
+from awake.operand import ProcAddress
 
 class JumpTable(object):
     def __init__(self, proj, addr):
@@ -31,7 +31,7 @@ class JumpTable(object):
             if not value.inPhysicalMem():
                 break
 
-            self.targets.append(operand.ProcAddress(value))
+            self.targets.append(ProcAddress(value))
 
     def render(self, renderer):
         renderer.addLegacy('<h1>Jump table at ' + str(self.addr) + '</h1>')

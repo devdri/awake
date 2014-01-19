@@ -14,9 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from . import address
-from . import operand
-from .operand import Register, Condition, Dereference
+from awake import address
+from awake.operand import Constant, Condition, Dereference, Register
 
 BC = Register("BC")
 DE = Register("DE")
@@ -53,7 +52,7 @@ def get(name, value):
     if name in tab:
         return tab[name][value]
     elif name == "N":
-        return operand.Constant(value * 0x08)
+        return Constant(value * 0x08)
     elif name == "I":
-        return operand.Constant(value)
+        return Constant(value)
 

@@ -14,9 +14,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from . import operand
+from awake.operand import Constant, Operand
 
-class Operator(operand.Operand):
+class Operator(Operand):
 
     def __init__(self, *args):
         self.childs = args
@@ -84,7 +84,7 @@ class BinOp(Operator):
     @classmethod
     def make(cls, left, right):
         if isConstant(left) and isConstant(right):
-            return operand.Constant(cls.calculate(left.value, right.value))
+            return Constant(cls.calculate(left.value, right.value))
         else:
             return super(BinOp, cls).make(left, right)
 
@@ -102,9 +102,9 @@ class Add(BinOp):
         if right.value == 0:
             return left
         if left == right:
-            return Shl.make(left, operand.Constant(1))
+            return Shl.make(left, Constant(1))
         if isinstance(left, Sub) and isConstant(left.right):
-            return Add.make(left.left, operand.Constant(Sub.calculate(right.value, left.right.value)))
+            return Add.make(left.left, Constant(Sub.calculate(right.value, left.right.value)))
         return super(Add, cls).make(left, right)
 
 class Sub(BinOp):
@@ -121,9 +121,9 @@ class Sub(BinOp):
         if right.value == 0:
             return left
         if left == right:
-            return operand.Constant(0)
+            return Constant(0)
         if isinstance(left, Sub) and isConstant(left.right):
-            return Sub.make(left.left, operand.Constant(Add.calculate(right.value, left.right.value)))
+            return Sub.make(left.left, Constant(Add.calculate(right.value, left.right.value)))
         return super(Sub, cls).make(left, right)
 
 class And(BinOp):
@@ -142,7 +142,7 @@ class And(BinOp):
             if (left.value_mask & right.value) == left.value_mask:
                 return left
             if (left.value_mask & right.value) == 0:
-                return operand.Constant(0)
+                return Constant(0)
 
         if right == left:
             return left
@@ -200,7 +200,7 @@ class Equals(BinOp):
         if isConstant(left):
             left, right = right, left
         if isinstance(left, Sub) and isConstant(left.right) and isConstant(right):
-            return Equals.make(left.left, operand.Constant(Add.calculate(right.value, left.right.value)))
+            return Equals.make(left.left, Constant(Add.calculate(right.value, left.right.value)))
         return super(Equals, cls).make(left, right)
 
 class NotEquals(BinOp):
@@ -249,19 +249,19 @@ class Shl(BinOp):
         if isConstant(right):
 
             if isinstance(left, Shl) and isConstant(left.right):
-                right = operand.Constant(right.value + left.right.value)
+                right = Constant(right.value + left.right.value)
                 left = left.left
 
             if isinstance(left, Shr) and isConstant(left.right):
                 sh_a = left.right.value
                 sh_b = right.value
-                mask = operand.Constant(((0xFF >> sh_a) << sh_b) & 0xFF)
+                mask = Constant(((0xFF >> sh_a) << sh_b) & 0xFF)
                 sum_shift = sh_b - sh_a
 
                 if sum_shift < 0:
-                    return And.make(Shr.make(left.left, operand.Constant(-sum_shift)), mask)
+                    return And.make(Shr.make(left.left, Constant(-sum_shift)), mask)
                 else:
-                    return And.make(Shl.make(left.left, operand.Constant(sum_shift)), mask)
+                    return And.make(Shl.make(left.left, Constant(sum_shift)), mask)
 
             if isinstance(left, And):
                 a = left.left
@@ -290,19 +290,19 @@ class Shr(BinOp):
         if isConstant(right):
 
             if isinstance(left, Shr) and isConstant(left.right):
-                right = operand.Constant(right.value + left.right.value)
+                right = Constant(right.value + left.right.value)
                 left = left.left
 
             if isinstance(left, Shl) and isConstant(left.right):
                 sh_a = left.right.value
                 sh_b = right.value
-                mask = operand.Constant(((0xFF << sh_a) & 0xFF) >> sh_b)
+                mask = Constant(((0xFF << sh_a) & 0xFF) >> sh_b)
                 sum_shift = sh_b - sh_a
 
                 if sum_shift < 0:
-                    return And.make(Shl.make(left.left, operand.Constant(-sum_shift)), mask)
+                    return And.make(Shl.make(left.left, Constant(-sum_shift)), mask)
                 else:
-                    return And.make(Shr.make(left.left, operand.Constant(sum_shift)), mask)
+                    return And.make(Shr.make(left.left, Constant(sum_shift)), mask)
 
             if isinstance(left, And):
                 a = left.left
@@ -346,7 +346,7 @@ class Add16(BinOp):
         if right.value == 0:
             return left
         if isinstance(left, Add16) and isConstant(right) and isConstant(left.right):
-            return cls.make(left.left, operand.Constant(cls.calculate(right.value, left.right.value)))
+            return cls.make(left.left, Constant(cls.calculate(right.value, left.right.value)))
         return super(Add16, cls).make(left, right)
 
 class Sub16(BinOp):
@@ -398,7 +398,7 @@ class FuncOperator(Operator):
     def make(cls, *args):
         if hasattr(cls, 'calculate') and all(isConstant(x) for x in args):
             values = [x.value for x in args]
-            return operand.Constant(cls.calculate(*values))
+            return Constant(cls.calculate(*values))
         return super(FuncOperator, cls).make(*args)
 
 class PopValue(FuncOperator):
@@ -472,7 +472,7 @@ class Word(FuncOperator):
             hi_sh = hi.right.value
             lo_sh = lo.right.value
             if hi_sh + lo_sh == 8:
-                return Shl16.make(lo.left, operand.Constant(lo_sh))
+                return Shl16.make(lo.left, Constant(lo_sh))
 
         return super(Word, cls).make(hi, lo)
 

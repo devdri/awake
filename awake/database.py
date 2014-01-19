@@ -15,11 +15,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import sqlite3
-from . import depend
-from . import address
+from awake import address
+from awake.depend import decodeDependencySet, encodeDependencySet, unknownDependencySet
 from awake.tag import TagDB
-import procedure
 from awake.textrenderer import HtmlRenderer
+import procedure
 
 class ProcInfo(object):
     def __init__(self, connection, addr, result=None):
@@ -32,7 +32,7 @@ class ProcInfo(object):
         self.addr = addr
         if result:
             self.type = result[0]
-            self.depset = depend.decode(result[1])
+            self.depset = decodeDependencySet(result[1])
             self.has_switch = result[2]
             self.suspicious_switch = result[3]
             self.has_suspicious_instr = result[4]
@@ -41,7 +41,7 @@ class ProcInfo(object):
             self.length = result[7]
         else:
             self.type = "proc"
-            self.depset = depend.unknown()
+            self.depset = unknownDependencySet()
             self.has_switch = False
             self.suspicious_switch = False
             self.has_suspicious_instr = False
@@ -80,7 +80,7 @@ class ProcInfo(object):
         if not c.fetchone():
             c.execute('insert into procs(addr) values (?)', (str(self.addr),))
         c.execute('update procs set type=?, depset=?, has_switch=?, suspicious_switch=?, has_suspicious_instr=? , has_nop=?, has_ambig_calls=?, length=? where addr=?',
-                  (self.type, depend.encode(self.depset), int(self.has_switch), int(self.suspicious_switch), int(self.has_suspicious_instr), int(self.has_nop), int(self.has_ambig_calls), self.length, str(self.addr)))
+                  (self.type, encodeDependencySet(self.depset), int(self.has_switch), int(self.suspicious_switch), int(self.has_suspicious_instr), int(self.has_nop), int(self.has_ambig_calls), self.length, str(self.addr)))
 
         c.execute('delete from calls where source=?', (str(self.addr),))
         c.execute('delete from memref where proc=?', (str(self.addr),))
@@ -121,26 +121,6 @@ class Database(object):
 
     def reportProc(self, addr):
         procInfo(self.connection, addr).save(self.connection)
-
-    def getProcByteOwner(self, byte_addr, ignore_addr=None):
-        c = self.connection.cursor()
-        c.execute('select addr from procs where addr<=? order by addr desc', (str(byte_addr),))
-        result = c.fetchone()
-        if not result:
-            return None
-        c.close()
-
-        proc_addr = address.fromConventional(result[0])
-
-        if proc_addr == ignore_addr:
-            return None
-
-        proc = procedure.at(proc_addr)
-
-        if byte_addr not in proc.instructions:
-            return None
-
-        return proc_addr
 
     def getNextOwnedAddress(self, addr):
         c = self.connection.cursor()

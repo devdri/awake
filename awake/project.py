@@ -14,10 +14,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from awake.rom import Rom
 from awake.database import Database
 from awake.disasm import Z80Disasm
 from awake.flow import ProcedureFlowCache
+from awake.rom import Rom
 
 class Project(object):
     def __init__(self, filename):

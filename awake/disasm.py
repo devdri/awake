@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from . import opcodedispatcher
+from awake.opcodedispatcher import OpcodeDispatcher
 
 main_ops = """
 00011000 3 JP    v8_rel               @ read:            write: sideeffects;
@@ -109,8 +109,8 @@ cb_ops = """
 class Z80Disasm(object):
     def __init__(self, proj):
         self.proj = proj
-        self.main = opcodedispatcher.OpcodeDispatcher(main_ops.splitlines())
-        self.cb = opcodedispatcher.OpcodeDispatcher(cb_ops.splitlines())
+        self.main = OpcodeDispatcher(main_ops.splitlines())
+        self.cb = OpcodeDispatcher(cb_ops.splitlines())
         self.cache = dict()
         self.next_addr_cache = dict()
 

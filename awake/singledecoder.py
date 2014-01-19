@@ -15,29 +15,28 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from collections import defaultdict
-from . import instruction
-from . import operand
-from . import placeholders
-from . import opcodeeffect
-from . import context
-from . import expression
+from awake import instruction, placeholders
+from awake.opcodeeffect import OpcodeEffect
+from awake.operand import Constant
+from awake.context import Context
+from awake.expression import parse
 
 def fillOperand(text, params, argument, next_addr):
-    e = expression.parse(text)
+    e = parse(text)
     ctx = make_context(params, argument, next_addr)
     return e.optimizedWithContext(ctx)
 
 def make_context(params, argument, next_addr):
-    ctx = context.Context()
+    ctx = Context()
     if next_addr.bank() > 0:
-        ctx.setValue('ROMBANK', operand.Constant(next_addr.bank()))
-    ctx.setValue('v8', operand.Constant(argument))
-    ctx.setValue('FF00_v8', operand.Constant(0xFF00 + argument))
-    ctx.setValue('v16', operand.Constant(argument))
+        ctx.setValue('ROMBANK', Constant(next_addr.bank()))
+    ctx.setValue('v8', Constant(argument))
+    ctx.setValue('FF00_v8', Constant(0xFF00 + argument))
+    ctx.setValue('v16', Constant(argument))
     offset = argument
     if offset & 0x80:  # convert to signed offset
         offset -= 0x100
-    ctx.setValue('v8_rel', operand.Constant(next_addr.offset(offset).virtual()))
+    ctx.setValue('v8_rel', Constant(next_addr.offset(offset).virtual()))
     for p in params:
         value = placeholders.get(p, params[p])
         ctx.setValue('#'+p, value)
@@ -72,7 +71,7 @@ class SingleOpcodeDecoder(object):
 
         assert len(self.bitPattern) == 8
 
-        self.effect = opcodeeffect.OpcodeEffect(effect_format)
+        self.effect = OpcodeEffect(effect_format)
 
 
     def matchBits(self, opcode):

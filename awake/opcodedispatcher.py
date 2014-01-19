@@ -14,8 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from . import singledecoder
-from . import instruction
+from awake.instruction import BadOpcode
+from awake.singledecoder import SingleOpcodeDecoder
 
 class OpcodeDispatcher(object):
 
@@ -25,7 +25,7 @@ class OpcodeDispatcher(object):
             if not bit_format:
                 continue
 
-            decoder = singledecoder.SingleOpcodeDecoder(bit_format)
+            decoder = SingleOpcodeDecoder(bit_format)
             for i in range(256):
                 byte = i & 0xFF
                 if decoder.match(byte):
@@ -35,7 +35,7 @@ class OpcodeDispatcher(object):
         entry = proj.rom.get(addr)
         if entry not in self.dispatchTable:
             print('WARN: bad opcode', addr)
-            return instruction.BadOpcode([entry], addr), None
+            return BadOpcode([entry], addr), None
         decoder = self.dispatchTable[entry]
         opcodes = proj.rom.read(addr, decoder.length())
         return decoder.decode(proj, opcodes, addr)

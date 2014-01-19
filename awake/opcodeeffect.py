@@ -14,10 +14,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from . import regutil
-from . import placeholders
 import re
-from . import expression
+from awake import placeholders
+from awake.expression import parse
+from awake.regutil import splitRegister
 
 class OpcodeEffect(object):
     def __init__(self, text):
@@ -60,11 +60,11 @@ class OpcodeEffect(object):
                 # XXX: solution here: just add operand.getDependencies()
                 if hasattr(operand, 'target'):
                     reads.add('mem')
-                    reads |= regutil.splitRegister('HL')  # TODO: XXX: bad
+                    reads |= splitRegister('HL')  # TODO: XXX: bad
                 else:
-                    reads |= regutil.splitRegister(operand.name)
+                    reads |= splitRegister(operand.name)
             else:
-                reads |= regutil.splitRegister(x)
+                reads |= splitRegister(x)
 
         for x in self.writes:
             if x.startswith("#"):
@@ -74,18 +74,18 @@ class OpcodeEffect(object):
                 if hasattr(operand, 'target'):
                     name = '['+operand.target.name+']'
                     writes.add('mem')
-                    reads |= regutil.splitRegister('HL')  # TODO: XXX: bad
+                    reads |= splitRegister('HL')  # TODO: XXX: bad
                 else:
                     name = operand.name
-                    writes |= regutil.splitRegister(name)
+                    writes |= splitRegister(name)
                 if x in self.values:
-                    e = expression.parse(self.values[x])
+                    e = parse(self.values[x])
                     values[name] = e.optimizedWithContext(ctx)
                     loads.append((name, values[name]))
             else:
-                writes |= regutil.splitRegister(x)
+                writes |= splitRegister(x)
                 if x in self.values:
-                    e = expression.parse(self.values[x])
+                    e = parse(self.values[x])
                     values[x] = e.optimizedWithContext(ctx)
                     loads.append((x, values[x]))
 

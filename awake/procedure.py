@@ -14,11 +14,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from . import disasm
-from . import address
-from . import instruction
-from . import operand
 from collections import defaultdict
+from awake import address
+from awake.instruction import TailCall
+from awake.operand import ProcAddress
 
 def manualJumptableLimit(addr):
     if addr == address.fromConventional("0001:4187"):
@@ -119,7 +118,7 @@ class ProcedureRangeAnalysis(object):
                 return
             self.ownByte(addr.offset(i))
 
-    def tryExpandJumptable(self, jumptable_addr):
+    def tryExpandJumptable(self, proj, jumptable_addr):
 
         manual_limit = manualJumptableLimit(jumptable_addr)
         if manual_limit and self.jumptable_sizes[jumptable_addr] >= manual_limit:
@@ -132,8 +131,7 @@ class ProcedureRangeAnalysis(object):
         if not manual_limit and not self.isAvailableAddr(next_target_addr):
             return
 
-        rom = disasm.cur_rom
-        next_target = address.fromVirtualAndCurrent(rom.get_word(next_target_addr), self.start_addr)
+        next_target = address.fromVirtualAndCurrent(proj.rom.get_word(next_target_addr), self.start_addr)
 
         if not manual_limit:
             if not next_target.inPhysicalMem() or next_target.virtual() <= 0x4A:
@@ -199,7 +197,7 @@ class ProcedureRangeAnalysis(object):
                 self.visitInstruction(proj, x)
             else:
                 x = self.jumptable_queue.pop()
-                self.tryExpandJumptable(x)
+                self.tryExpandJumptable(proj, x)
 
     def firstGap(self):
         addr = self.start_addr
@@ -221,7 +219,6 @@ class ProcedureRangeAnalysis(object):
         renderer.nameForAddress(self.start_addr)
         renderer.addLegacy('</h1>\n')
         renderer.addLegacy('<pre class="disasm">')
-        from . import disasm
         for addr in sorted(self.visited):
             if addr in self.labels:
                 renderer.label(addr)
@@ -270,7 +267,7 @@ class ProcedureGraph(object):
         pos = len(self.blocks)
         self.block_id_at_addr[addr] = pos
 
-        instr = instruction.TailCall(proj, operand.ProcAddress(addr))
+        instr = TailCall(proj, ProcAddress(addr))
 
         from .flowcontrol import Block
         self.blocks.append(Block([instr]))

@@ -14,13 +14,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from . import jumptable
-from . import regutil
-from . import placeholders
-from . import operand
-from . import address
-from . import depend
-from . import expression
+from awake import address, placeholders
+from awake.depend import DependencySet, unknownDependencySet
+from awake.expression import parse
+from awake.jumptable import JumpTable
+from awake.operand import ComplexValue, ComputedProcAddress, JumpTableAddress, ProcAddress
+from awake.regutil import ALL_REGS, joinRegisters, splitRegister, splitRegisters
 
 class Instruction(object):
     def __init__(self, name, addr=None):
@@ -56,10 +55,10 @@ class Instruction(object):
         return self
 
     def getDependencies(self, needed):
-        return needed | regutil.ALL_REGS
+        return needed | ALL_REGS
 
     def getDependencySet(self):
-        return depend.unknown()
+        return unknownDependencySet()
 
     def optimizeDependencies(self, needed):
         return self
@@ -104,7 +103,7 @@ class ExpressionOp(BaseOp):
     def optimizedWithContext(self, ctx):
         for w in self._writes:
             if w not in self._values:
-                ctx.setValue(w, operand.ComplexValue(self.name))
+                ctx.setValue(w, ComplexValue(self.name))
             else:
                 value = self._values[w]
                 value = value.optimizedWithContext(ctx)
@@ -116,7 +115,7 @@ class ExpressionOp(BaseOp):
         return (needed - self._writes) | self._reads
 
     def getDependencySet(self):
-        return depend.DependencySet(self._reads, self._writes)
+        return DependencySet(self._reads, self._writes)
 
     def splitToSimple(self):
 
@@ -129,14 +128,14 @@ class ExpressionOp(BaseOp):
         for w in self._loads:
             name = w[0]
             value = w[1]
-            target = expression.parse(name)
-            writes -= regutil.splitRegisters(target.getDependencies())
+            target = parse(name)
+            writes -= splitRegisters(target.getDependencies())
             instr = LoadInstruction('LD_'+self.name, target, value, self.addr)
             out.append(instr)
 
         for w in writes:
-            value = operand.ComplexValue(self.name, self.getDependencySet().reads)
-            target = expression.parse(w)
+            value = ComplexValue(self.name, self.getDependencySet().reads)
+            target = parse(w)
             instr = LoadInstruction('LD_'+self.name, target, value, self.addr)
             out.append(instr)
 
@@ -182,7 +181,7 @@ class JumpInstruction(Instruction):
             self.target = target
         elif target.value is not None:
             self.targetAddr = address.fromVirtualAndCurrent(target.value, addr)
-            self.target = operand.ProcAddress(self.targetAddr)
+            self.target = ProcAddress(self.targetAddr)
         else:
             self.targetAddr = None
             self.target = target
@@ -194,7 +193,7 @@ class JumpInstruction(Instruction):
         return (needed - self._writes) | self._reads
 
     def getDependencySet(self):
-        return depend.DependencySet(self._reads, self._writes)
+        return DependencySet(self._reads, self._writes)
 
     def hasContinue(self):
         try:
@@ -235,22 +234,22 @@ class CallInstruction(Instruction):
 
         # XXX: IDIOM [CALL LONG E:HL]
         if hasattr(target, 'value') and target.value == 0x008A:
-            target = operand.ComputedProcAddress(placeholders.E, placeholders.HL)
+            target = ComputedProcAddress(placeholders.E, placeholders.HL)
 
         self.cond = cond
         if hasattr(target, 'getAddress'):
             self.targetAddr = target.getAddress()
-            self.target = operand.ProcAddress(self.targetAddr)
+            self.target = ProcAddress(self.targetAddr)
         elif hasattr(target, 'value') and target.value is not None:
             self.targetAddr = address.fromVirtualAndCurrent(target.value, addr)
-            self.target = operand.ProcAddress(self.targetAddr)
+            self.target = ProcAddress(self.targetAddr)
         else:
             self.targetAddr = address.fromVirtual(0x4000)  # XXX: ambiguous address
             self.target = target
 
         self.target_depset = proj.database.procInfo(self.targetAddr).depset
 
-        self.returns_used = regutil.ALL_REGS
+        self.returns_used = ALL_REGS
         self.constant_params = dict()
 
     def getDependencies(self, needed):
@@ -260,10 +259,10 @@ class CallInstruction(Instruction):
 
     def getDependencySet(self):
         reads = set(self.target_depset.reads)
-        for r in regutil.joinRegisters(reads):
+        for r in joinRegisters(reads):
             if r in self.constant_params:
-                reads -= regutil.splitRegister(r)
-        return depend.DependencySet(reads, self.target_depset.writes)
+                reads -= splitRegister(r)
+        return DependencySet(reads, self.target_depset.writes)
 
     def optimizeDependencies(self, needed):
         self.returns_used = needed & self.getDependencySet().writes
@@ -276,13 +275,13 @@ class CallInstruction(Instruction):
             self.targetAddr = self.target.getAddress()
         elif hasattr(self.target, 'value') and self.target.value is not None:
             self.targetAddr = address.fromVirtualAndCurrent(self.target.value, self.addr)
-            self.target = operand.ProcAddress(self.targetAddr)
+            self.target = ProcAddress(self.targetAddr)
         else:
             pass  # XXX
 
         deps = self.getDependencySet()
 
-        ins = regutil.joinRegisters(deps.reads - set(['mem']))
+        ins = joinRegisters(deps.reads - set(['mem']))
 
         for param in ins:
             if ctx.hasConstantValue(param):
@@ -321,8 +320,8 @@ class CallInstruction(Instruction):
         if not self.cond.alwaysTrue():
             x = 'CONDITIONAL'
 
-        ins = regutil.joinRegisters(self.getDependencySet().reads - set(['mem']))
-        outs = regutil.joinRegisters(self.returns_used - set(['mem']))
+        ins = joinRegisters(self.getDependencySet().reads - set(['mem']))
+        outs = joinRegisters(self.returns_used - set(['mem']))
 
         ins |= set(param+'='+str(self.constant_params[param]) for param in self.constant_params)
 
@@ -342,8 +341,8 @@ class TailCall(CallInstruction):
 
 class SwitchInstruction(BaseOp):
     def __init__(self, proj, addr):
-        super(SwitchInstruction, self).__init__('switch', [placeholders.A, operand.JumpTableAddress(addr.offset(1))], addr)
-        self.jt = jumptable.JumpTable(proj, addr.offset(1))
+        super(SwitchInstruction, self).__init__('switch', [placeholders.A, JumpTableAddress(addr.offset(1))], addr)
+        self.jt = JumpTable(proj, addr.offset(1))
 
     def optimizedWithContext(self, ctx):
         return self

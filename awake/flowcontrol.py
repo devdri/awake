@@ -14,23 +14,22 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from . import instruction
-from . import operand
-from . import context
-from . import regutil
-from . import depend
-from . import placeholders
-from . import address
+from awake import address, placeholders
+from awake.context import Context
+from awake.depend import DependencySet, dependParallel, unknownDependencySet
+from awake.instruction import BaseOp, Instruction
+from awake.operand import AddressConstant, Constant, JumpTableAddress, LabelAddress
+from awake.regutil import ALL_REGS, joinRegisters
 
-class Label(instruction.BaseOp):
+class Label(BaseOp):
     def __init__(self, addr):
-        super(Label, self).__init__('label', [operand.AddressConstant(addr)])
+        super(Label, self).__init__('label', [AddressConstant(addr)])
         self.addr = address.fromVirtual(0)
         self.gotos = set()
         self.breaks = set()
         self.continues = set()
-        self.needed = regutil.ALL_REGS - set(['FZ', 'FC', 'FN', 'FH'])
-        self.depset = depend.unknown()
+        self.needed = ALL_REGS - set(['FZ', 'FC', 'FN', 'FH'])
+        self.depset = unknownDependencySet()
 
     def addGoto(self, x):
         self.gotos.add(x)
@@ -54,7 +53,7 @@ class Label(instruction.BaseOp):
         return needed
 
     def getDependencySet(self):
-        return depend.DependencySet()
+        return DependencySet()
 
     def optimizeDependencies(self, needed):
         if self.gotos or self.breaks or self.continues:
@@ -65,7 +64,7 @@ class Label(instruction.BaseOp):
             return None
 
     def signature(self):
-        ins = regutil.joinRegisters(self.needed - set(['mem']))
+        ins = joinRegisters(self.needed - set(['mem']))
         return ' @ ' + ', '.join(sorted(str(x) for x in ins if not isinstance(x, address.Address)))
 
     def render(self, renderer, labels=None):
@@ -76,10 +75,10 @@ class Label(instruction.BaseOp):
             renderer.newline()
         renderer.addLegacy('<a name="{0}">label_{1}</a>: {2}'.format(self.addr, self.addr, self.signature()))
 
-class FlowTerminator(instruction.BaseOp):
+class FlowTerminator(BaseOp):
     def __init__(self, name, target=None):
         if target:
-            operands = [operand.LabelAddress(target)]
+            operands = [LabelAddress(target)]
         else:
             operands = []
         super(FlowTerminator, self).__init__(name, operands)
@@ -101,10 +100,10 @@ class Goto(FlowTerminator):
         return self.target_label.needed
 
     def getDependencySet(self):
-        return depend.DependencySet(self.target_label.depset.reads, set())
+        return DependencySet(self.target_label.depset.reads, set())
 
     def signature(self):
-        ins = regutil.joinRegisters(self.target_label.needed - set(['mem']))
+        ins = joinRegisters(self.target_label.needed - set(['mem']))
         return ' @ ' + ', '.join(sorted(str(x) for x in ins if not isinstance(x, address.Address)))
 
 class Break(FlowTerminator):
@@ -117,10 +116,10 @@ class Break(FlowTerminator):
         return self.target_label.needed
 
     def getDependencySet(self):
-        return depend.DependencySet(self.target_label.depset.reads, set())
+        return DependencySet(self.target_label.depset.reads, set())
 
     def signature(self):
-        ins = regutil.joinRegisters(self.target_label.needed - set(['mem']))
+        ins = joinRegisters(self.target_label.needed - set(['mem']))
         return ' @ ' + ', '.join(sorted(str(x) for x in ins if not isinstance(x, address.Address)))
 
 class Continue(FlowTerminator):
@@ -135,10 +134,10 @@ class Continue(FlowTerminator):
     def getDependencySet(self):
         #return self.target_label.depset
         #TODO: XXX: return depend.DependencySet(self.target_label.depset.reads, regutil.ALL_REGS)
-        return depend.DependencySet(self.target_label.depset.reads, set())
+        return DependencySet(self.target_label.depset.reads, set())
 
     def signature(self):
-        ins = regutil.joinRegisters(self.target_label.needed - set(['mem']))
+        ins = joinRegisters(self.target_label.needed - set(['mem']))
         return ' @ ' + ', '.join(sorted(str(x) for x in ins if not isinstance(x, address.Address)))
 
 class Return(FlowTerminator):
@@ -146,12 +145,12 @@ class Return(FlowTerminator):
         super(Return, self).__init__("return")
 
     def getDependencySet(self):
-        return depend.DependencySet()
+        return DependencySet()
 
     def getDependencies(self, needed):
         return needed
 
-class Block(instruction.Instruction):
+class Block(Instruction):
     def __init__(self, contents):
         self.contents = []
         for x in contents:
@@ -198,9 +197,9 @@ class Block(instruction.Instruction):
         return needed
 
     def getDependencySet(self):
-        cur = depend.DependencySet()
+        cur = DependencySet()
         for instr in reversed(self.contents):
-            cur = depend.joinDependencies(instr.getDependencySet(), cur)
+            cur = joinDependencies(instr.getDependencySet(), cur)
         return cur
 
     def optimizeDependencies(self, needed):
@@ -220,7 +219,7 @@ class Block(instruction.Instruction):
             else:
                 out.add(x)
 
-class Switch(instruction.Instruction):
+class Switch(Instruction):
     def __init__(self, addr, branches, arg=None, base_value=0):
         self.name = 'switch-highlevel'
         if not arg:
@@ -229,11 +228,11 @@ class Switch(instruction.Instruction):
             self.arg = arg
         self.addr = addr
         self.branches = branches
-        self.jtAddr = operand.JumpTableAddress(addr.offset(1))
+        self.jtAddr = JumpTableAddress(addr.offset(1))
         self.base_value = base_value
 
     def valueForBranch(self, i):
-        return operand.Constant(self.base_value + i)
+        return Constant(self.base_value + i)
 
     def render(self, renderer):
         renderer.newInstruction(self.addr)
@@ -284,17 +283,17 @@ class Switch(instruction.Instruction):
         return deps
 
     def getDependencySet(self):
-        deps = depend.DependencySet()
+        deps = DependencySet()
         for b in self.branches:
-            deps = depend.parallel(b.getDependencySet(), deps)
-        return depend.DependencySet(deps.reads | self.arg.getDependencies(), deps.writes)
+            deps = dependParallel(b.getDependencySet(), deps)
+        return DependencySet(deps.reads | self.arg.getDependencies(), deps.writes)
 
     def optimizeDependencies(self, needed):
         branches = [b.optimizeDependencies(needed) for b in self.branches]
         return Switch(self.addr, branches, self.arg, self.base_value)
 
 
-class If(instruction.Instruction):
+class If(Instruction):
     def __init__(self, split, cond, option_a, option_b):
         self.name = 'if'
         self.split = split
@@ -380,13 +379,13 @@ class If(instruction.Instruction):
         return deps
 
     def getDependencySet(self):
-        deps = depend.DependencySet()
+        deps = DependencySet()
         if self.option_a:
-            deps = depend.parallel(self.option_a.getDependencySet(), deps)
+            deps = dependParallel(self.option_a.getDependencySet(), deps)
         if self.option_b:
-            deps = depend.parallel(self.option_b.getDependencySet(), deps)
-        cond_deps = depend.DependencySet(self.cond.getDependencies())
-        return depend.joinDependencies(cond_deps, deps)
+            deps = dependParallel(self.option_b.getDependencySet(), deps)
+        cond_deps = DependencySet(self.cond.getDependencies())
+        return joinDependencies(cond_deps, deps)
 
     def optimizeDependencies(self, needed):
         option_a = None
@@ -407,7 +406,7 @@ class If(instruction.Instruction):
     def getMemreads(self):
         return self.cond.getMemreads()
 
-class LoopWhile(instruction.Instruction):
+class LoopWhile(Instruction):
 
     def complexity(self):
         return 4 + self.inner.complexity()
@@ -461,8 +460,8 @@ class DoWhile(LoopWhile):
 
     def getDependencySet(self):
         x = self.inner.getDependencySet()
-        postcond_deps = depend.DependencySet(self.postcond.getDependencies())
-        return depend.joinDependencies(x, postcond_deps)
+        postcond_deps = DependencySet(self.postcond.getDependencies())
+        return joinDependencies(x, postcond_deps)
 
     def optimizeDependencies(self, needed):
         if self.continue_label:
@@ -474,7 +473,7 @@ class DoWhile(LoopWhile):
         deps = self.inner.getDependencySet()
         loopvars = deps.writes & (deps.reads | self.postcond.getDependencies())
         loopvars -= set(['mem'])
-        loopvars = regutil.joinRegisters(loopvars)
+        loopvars = joinRegisters(loopvars)
         return " @ loopvars: " + ", ".join(sorted(str(x) for x in loopvars if not isinstance(x, address.Address)))
 
     def getMemreads(self):
@@ -504,7 +503,7 @@ class While(LoopWhile):
 
     def optimizedWithContext(self, ctx):
         ctx.invalidateAll()
-        inner = self.inner.optimizedWithContext(context.Context())
+        inner = self.inner.optimizedWithContext(Context())
         return While(inner, self.continue_label)
 
     def getDependencies(self, needed):
@@ -529,6 +528,6 @@ class While(LoopWhile):
         deps = self.inner.getDependencySet()
         loopvars = deps.writes & deps.reads
         loopvars -= set(['mem'])
-        loopvars = regutil.joinRegisters(loopvars)
+        loopvars = joinRegisters(loopvars)
         return " @ loopvars: " + ", ".join(sorted(str(x) for x in loopvars if not isinstance(x, address.Address)))
 

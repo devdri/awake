@@ -16,7 +16,7 @@
 
 from collections import defaultdict
 from PIL import Image
-from . import address
+from awake import address
 
 def addr_symbol(addr):
     return 'A' + str(addr).replace(':', '_')

@@ -14,10 +14,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from . import operator
-import shlex
-import re
-from . import operand
+import re, shlex
+from awake.operator import binary_operators, functions
+from awake.operand import Dereference, Constant, Register
 
 class ExpressionError(Exception):
     def __init__(self, msg):
@@ -47,17 +46,17 @@ def function(name, args):
     return operator.functions[name][0](*args)
 
 def dereference(target):
-    return operand.Dereference(target)
+    return Dereference(target)
 
 def constant(arg):
     if arg.startswith('0x'):
         value = int(arg, 16)
     else:
         value = int(arg)
-    return operand.Constant(value)
+    return Constant(value)
 
 def register(arg):
-    return operand.Register(arg)
+    return Register(arg)
 
 def expression(lexer):
     stack = [term(lexer)]

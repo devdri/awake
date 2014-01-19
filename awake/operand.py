@@ -14,8 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from . import address
-from . import regutil
+from awake import address
+from awake.regutil import REGS16, splitRegister
 
 class Operand(object):
     bits = 8
@@ -152,7 +152,7 @@ class Register(Operand):
         return self
 
     def getDependencies(self):
-        return regutil.splitRegister(self.name)
+        return splitRegister(self.name)
 
     def __hash__(self):
         return hash((Register, self.name))
@@ -162,7 +162,7 @@ class Register(Operand):
 
     @property
     def bits(self):
-        if self.name in regutil.REGS16:
+        if self.name in REGS16:
             return 16
         else:
             return 8

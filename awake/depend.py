@@ -14,20 +14,20 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from . import regutil
+from awake.regutil import joinRegisters, ALL_REGS
 
 def joinDependencies(first, second):
     reads = second.reads - first.writes | first.reads
     writes = first.writes | second.writes
     return DependencySet(reads, writes)
 
-def parallel(a, b):
+def dependParallel(a, b):
     reads = a.reads | b.reads
     writes = a.writes | b.writes
     return DependencySet(reads, writes)
 
-def unknown():
-    return DependencySet(regutil.ALL_REGS - set(['FZ', 'FC', 'FN', 'FH']), regutil.ALL_REGS - set(['ROMBANK']))
+def unknownDependencySet():
+    return DependencySet(ALL_REGS - set(['FZ', 'FC', 'FN', 'FH']), ALL_REGS - set(['ROMBANK']))
 
 class DependencySet:
     def __init__(self, reads=None, writes=None):
@@ -41,16 +41,16 @@ class DependencySet:
             self.writes = set()
 
     def __str__(self):
-        return 'DependencySet({0}, {1})'.format(regutil.joinRegisters(self.reads), regutil.joinRegisters(self.writes))
+        return 'DependencySet({0}, {1})'.format(joinRegisters(self.reads), joinRegisters(self.writes))
 
-def encode(depset):
-    return ", ".join(str(x) for x in regutil.joinRegisters(depset.reads)) + " -> " + ", ".join(str(x) for x in regutil.joinRegisters(depset.writes))
+def encodeDependencySet(depset):
+    return ", ".join(str(x) for x in joinRegisters(depset.reads)) + " -> " + ", ".join(str(x) for x in joinRegisters(depset.writes))
 
-def decode(text):
+def decodeDependencySet(text):
     if not text:
         return DependencySet()
     r, w = text.split("->")
     reads = set(x.strip() for x in r.split(","))
     writes = set(x.strip() for x in w.split(","))
-    return DependencySet(regutil.splitRegisters(reads), regutil.splitRegisters(writes))
+    return DependencySet(splitRegisters(reads), splitRegisters(writes))
 

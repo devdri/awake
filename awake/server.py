@@ -17,13 +17,12 @@
 import Queue
 import Tkinter as tk
 import ttk
-from awake import procedure
-from awake.util import AsyncTask, getTkRoot
-from awake.project import Project
-from awake import ui
-from BaseHTTPServer import HTTPServer
 import httplib
 import webbrowser
+from BaseHTTPServer import HTTPServer
+from awake import procedure, ui
+from awake.util import AsyncTask, getTkRoot
+from awake.project import Project
 
 class StoppableHandler(ui.Handler):
     def do_GET(self):
