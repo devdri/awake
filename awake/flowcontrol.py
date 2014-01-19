@@ -18,7 +18,6 @@ from . import instruction
 from . import operand
 from . import context
 from . import regutil
-from . import html
 from . import depend
 from . import placeholders
 from . import address
@@ -69,10 +68,13 @@ class Label(instruction.BaseOp):
         ins = regutil.joinRegisters(self.needed - set(['mem']))
         return ' @ ' + ', '.join(sorted(str(x) for x in ins if not isinstance(x, address.Address)))
 
-    def html(self, database, indent=0, labels=None):
+    def render(self, renderer, indent=0, labels=None):
         if not self.gotos:
-            return ''
-        return '<a name="{0}">label_{1}</a>: {2}\n'.format(self.addr, self.addr, self.signature())
+            return
+
+        if not renderer.emptyLine:
+            renderer.newline()
+        renderer.addLegacy('<a name="{0}">label_{1}</a>: {2}'.format(self.addr, self.addr, self.signature()))
 
 class FlowTerminator(instruction.BaseOp):
     def __init__(self, name, target=None):
@@ -176,8 +178,9 @@ class Block(instruction.Instruction):
             return True
         return self.contents[-1].hasContinue()
 
-    def html(self, database, indent=0):
-        return ''.join(el.html(database, indent) for el in self.contents)
+    def render(self, renderer, indent=0):
+        for el in self.contents:
+            el.render(renderer, indent)
 
     def __str__(self):
         return 'block'+str(len(self.contents))+':'+str(bool(self))+'(' + ','.join(sorted(str(el) for el in self.contents)) + ')'
@@ -232,13 +235,25 @@ class Switch(instruction.Instruction):
     def valueForBranch(self, i):
         return operand.Constant(self.base_value + i)
 
-    def html(self, database, indent):
-        out = html.instruction(database, self.addr, 'switch ('+self.arg.html(database)+', '+self.jtAddr.html(database)+') {', '', indent)
+    def render(self, renderer, indent):
+        renderer.newInstruction(self.addr, indent)
+        renderer.instructionName('switch')
+        renderer.add(' (')
+        self.arg.render(renderer)
+        renderer.add(', ')
+        self.jtAddr.render(renderer)
+        renderer.add(') {')
+
         for (i, b) in enumerate(self.branches):
-            out += html.instruction(database, self.addr, 'case '+self.valueForBranch(i).html(database)+':', '', indent)
-            out += b.html(database, indent+1)
-        out += html.instruction(database, self.addr, '}', '', indent)
-        return out
+            renderer.newInstruction(self.addr, indent)
+            renderer.instructionName('case')
+            renderer.add(' ')
+            self.valueForBranch(i).render(renderer)
+            renderer.add(':')
+            b.render(renderer, indent+1)
+
+        renderer.newInstruction(self.addr, indent)
+        renderer.add('}')
 
     def getInstructions(self, out):
         for b in self.branches:
@@ -300,23 +315,30 @@ class If(instruction.Instruction):
             return True
         return self.option_a.hasContinue() or self.option_b.hasContinue()
 
-    def html(self, database, indent):
+    def render(self, renderer, indent):
         addr = self.addr
-        out = html.instruction(database, addr, 'if ('+self.cond.html(database)+') {', '', indent)
+        renderer.newInstruction(addr, indent)
+        renderer.instructionName('if')
+        renderer.add(' (')
+        self.cond.render(renderer)
+        renderer.add(') {')
 
         if not self.option_a and not self.option_b:
-            out += html.instruction(database, addr, 'WARN: empty if', '', indent)
+            renderer.newInstruction(addr, indent)
+            renderer.instructionName('WARN: empty if')
+
         elif not self.option_a:
-            out += self.option_b.html(database, indent+1)
+            self.option_b.render(renderer, indent+1)
         else:
-            out += self.option_a.html(database, indent+1)
+            self.option_a.render(renderer, indent+1)
 
         if self.option_b and self.option_a:
-            out += html.instruction(database, addr, '} else {', '', indent)
-            out += self.option_b.html(database, indent+1)
+            renderer.newInstruction(addr, indent)
+            renderer.instructionName('} else {')
+            self.option_b.render(renderer, indent+1)
 
-        out += html.instruction(database, addr, '}', '', indent)
-        return out
+        renderer.newInstruction(addr, indent)
+        renderer.add('}')
 
     def optimizedWithContext(self, ctx):
 
@@ -399,12 +421,19 @@ class DoWhile(LoopWhile):
         self.continue_label = continue_label
         continue_label.addContinue(self)
 
-    def html(self, database, indent):
+    def render(self, renderer, indent):
         addr = "0000:0000"  # TODO: inner first addr
-        out = html.instruction(database, addr, 'do {', '', indent, self.signature())
-        out += self.inner.html(database, indent+1)
-        out += html.instruction(database, addr, '} while ('+self.postcond.html(database)+')', '', indent)
-        return out
+
+        renderer.newInstruction(addr, indent)
+        renderer.instructionName('do {')
+        renderer.instructionSignature(self.signature())
+
+        self.inner.render(renderer, indent+1)
+
+        renderer.newInstruction(addr, indent)
+        renderer.instructionName('} while (')
+        self.postcond.render(renderer)
+        renderer.add(')')
 
     def optimizedWithContext(self, ctx):
 
@@ -456,12 +485,17 @@ class While(LoopWhile):
         self.continue_label = continue_label
         continue_label.addContinue(self)
 
-    def html(self, database, indent):
+    def render(self, renderer, indent):
         addr = "0000:0000"  # TODO: inner first addr
-        out = html.instruction(database, addr, 'while (1) {', '', indent, self.signature())
-        out += self.inner.html(database, indent+1)
-        out += html.instruction(database, addr, '}', '', indent)
-        return out
+
+        renderer.newInstruction(addr, indent)
+        renderer.instructionName('while (1) {')
+        renderer.instructionSignature(self.signature())
+
+        self.inner.render(renderer, indent+1)
+
+        renderer.newInstruction(addr, indent)
+        renderer.instructionName('}')
 
     def hasContinue(self):
         return False

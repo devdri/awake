@@ -19,6 +19,7 @@ from . import depend
 from . import address
 from awake.tag import TagDB
 import procedure
+from awake.textrenderer import HtmlRenderer
 
 class ProcInfo(object):
     def __init__(self, connection, addr, result=None):
@@ -95,10 +96,8 @@ class ProcInfo(object):
         c.close()
         connection.commit()
 
-    def html(self, database):
-        out = ''
-        from . import operand
-        #out += operand.
+    def render(self, renderer):
+        pass
 
 class Database(object):
     def __init__(self, filename):
@@ -193,26 +192,33 @@ class Database(object):
 
     def getInteresting(self):
         from . import operand
-        out = '<pre>'
+
+        renderer = HtmlRenderer(self)
+
         c = self.connection.cursor()
         c.execute('select addr from procs where has_ambig_calls=1')
-        out += 'ambig calls:\n'
+        renderer.add('ambig calls:\n')
         for result in c.fetchall():
             addr = address.fromConventional(result[0])
-            out += '    ' + operand.ProcAddress(addr).html(self) + '\n'
+            renderer.pad(1)
+            operand.ProcAddress(addr).render(renderer)
+            renderer.newline()
         c.execute('select addr from procs where suspicious_switch=1')
-        out += 'suspicious switch:\n'
+        renderer.add('suspicious switch:\n')
         for result in c.fetchall():
             addr = address.fromConventional(result[0])
-            out += '    ' + operand.ProcAddress(addr).html(self) + '\n'
+            renderer.pad(1)
+            operand.ProcAddress(addr).render(renderer)
+            renderer.newline()
         c.execute('select addr from procs where has_suspicious_instr=1')
-        out += 'suspicious instr:\n'
+        renderer.add('suspicious instr:\n')
         for result in c.fetchall():
             addr = address.fromConventional(result[0])
-            out += '    ' + operand.ProcAddress(addr).html(self) + '\n'
+            renderer.pad(1)
+            operand.ProcAddress(addr).render(renderer) + '\n'
+            renderer.newline()
         c.close()
-        out += '</pre>'
-        return out
+        return '<pre>' + renderer.getContents() + '</pre>'
 
     def getAmbigCalls(self):
         out = set()
@@ -285,33 +291,41 @@ class Database(object):
         from . import operand
         bank_name = "{:04X}".format(bank)
 
-        out = '<pre>'
+        renderer = HtmlRenderer(self)
+
         c = self.connection.cursor()
 
-        out += 'public interface:\n'
+        renderer.add('public interface:\n')
         c.execute('select destination from calls where substr(source, 0, 5)<>? and substr(destination, 0, 5)=? group by destination order by destination', (bank_name, bank_name))
         for result in c.fetchall():
             addr = address.fromConventional(result[0])
-            out += '    ' + operand.ProcAddress(addr).html(self) + '\n'
+            renderer.pad(1)
+            operand.ProcAddress(addr).render(renderer) + '\n'
+            renderer.newline()
 
-        out += 'dependencies:\n'
+        renderer.add('dependencies:\n')
         c.execute('select destination from calls where substr(source, 0, 5)=? and substr(destination, 0, 5)<>? group by source order by source', (bank_name, bank_name))
         for result in c.fetchall():
             addr = address.fromConventional(result[0])
-            out += '    ' + operand.ProcAddress(addr).html(self) + '\n'
+            renderer.pad(1)
+            operand.ProcAddress(addr).render(renderer) + '\n'
+            renderer.newline()
 
-        out += 'reads:\n'
+        renderer.add('reads:\n')
         c.execute('select addr from memref where substr(proc, 0, 5)=? and type=? group by addr order by addr', (bank_name, 'read'))
         for result in c.fetchall():
             addr = address.fromConventional(result[0])
-            out += '    ' + operand.DataAddress(addr).html(self) + '\n'
+            renderer.pad(1)
+            operand.DataAddress(addr).render(renderer) + '\n'
+            renderer.newline()
 
-        out += 'writes:\n'
+        renderer.add('writes:\n')
         c.execute('select addr from memref where substr(proc, 0, 5)=? and type=? group by addr order by addr', (bank_name, 'write'))
         for result in c.fetchall():
             addr = address.fromConventional(result[0])
-            out += '    ' + operand.DataAddress(addr).html(self) + '\n'
+            renderer.pad(1)
+            operand.DataAddress(addr).render(renderer) + '\n'
+            renderer.newline()
 
         c.close()
-        out += '</pre>'
-        return out
+        return '<pre>' + renderer.getContents() + '</pre>'

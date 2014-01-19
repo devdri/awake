@@ -21,6 +21,7 @@ from tkFileDialog import asksaveasfilename
 from awake import flow, address, procedure, disasm
 from awake.util import AsyncTask, RadioGroup, getTkRoot, BankSelect
 from awake.database import Database
+from awake.textrenderer import HtmlRenderer
 
 class ExportTask(AsyncTask):
     scopes = (
@@ -88,17 +89,21 @@ class ExportTask(AsyncTask):
                     return
                 self.report(i, num_procs, "Analyzing proc: " + str(addr))
 
+                renderer = HtmlRenderer(database)
+
                 if self.mode == 'symbols':
                     if database.tagdb.hasNameForAddress(addr):
-                        print >>f, str(addr) + ' ' + database.tagdb.nameForAddress(addr)
+                        renderer.add(str(addr) + ' ' + database.tagdb.nameForAddress(addr))
                     else:
-                        print >>f, str(addr)
+                        renderer.add(str(addr))
                 elif self.mode == 'basic':
-                    print >>f, strip_tags(procedure.loadProcedureRange(addr, database).html(database))
+                    procedure.loadProcedureRange(addr, database).render(renderer)
                 elif self.mode == 'flow':
-                    print >>f, strip_tags(flow.ProcedureFlow(addr, database).html(database))
+                    flow.ProcedureFlow(addr, database).render(renderer)
                 else:
                     raise AttributeError
+
+                print >>f, strip_tags(renderer.getContents())
 
                 i += 1
 

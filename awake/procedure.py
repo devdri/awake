@@ -16,7 +16,6 @@
 
 from . import disasm
 from . import address
-from . import html
 from . import instruction
 from . import operand
 from collections import defaultdict
@@ -217,17 +216,17 @@ class ProcedureRangeAnalysis(object):
         self.block_starts = set(addr for addr in self.block_starts if self.isLocalAddr(addr))
         self.jumptable_sizes = dict((k, v) for (k, v) in self.jumptable_sizes.items() if self.isLocalAddr(k))
 
-    def html(self, database):
-        out = '<h1>Procedure {0}</h1>\n'.format(database.tagdb.nameForAddress(self.start_addr));
-        out += '<pre class="disasm">';
+    def render(self, renderer, database):
+        renderer.addLegacy('<h1>Procedure ')
+        renderer.nameForAddress(self.start_addr)
+        renderer.addLegacy('</h1>\n')
+        renderer.addLegacy('<pre class="disasm">')
         from . import disasm
         for addr in sorted(self.visited):
             if addr in self.labels:
-                out += html.label(database, addr)
-            out += disasm.decodeCache(database, addr)[0].html(database, 0)
-        out += '</pre>\n'
-
-        return out
+                renderer.label(addr)
+            disasm.decodeCache(database, addr)[0].render(renderer, 0)
+        renderer.addLegacy('</pre>\n')
 
 def getLimit(addr, database):
     if addr.inPhysicalMem():
@@ -367,18 +366,21 @@ class ProcedureGraph(object):
     def getProcLength(self):
         return self.end_addr.virtual() - self.start_addr.virtual()
 
-    def html(self, database):
-        out = ''
-        out += 'Proc graph ' + database.tagdb.nameForAddress(self.start_addr)
-        out += '<pre class="disasm">'
+    def render(self, renderer):
+        renderer.addLegacy('Proc graph ')
+        renderer.nameForAddress(self.start_addr)
+        renderer.addLegacy('<pre class="disasm">')
         for i, b in enumerate(self.blocks):
-            out += 'BLOCK' + str(i) + '\n'
-            out += b.html(database)
-        out += 'edges:\n'
+            renderer.add('BLOCK' + str(i))
+            renderer.newline()
+            b.render(renderer)
+        renderer.add('edges:')
+        renderer.newline()
         for x in self.vertices():
-            out += str(x) + ' -> ' + ', '.join(str(y) for y in self.childs(x)) + '\n'
-        out += '</pre>\n'
-        return out
+            renderer.add(str(x) + ' -> ')
+            renderer.renderList(self.childs(x))
+            renderer.newline()
+        renderer.addLegacy('</pre>\n')
 
 
 def loadProcedureRange(addr, database):

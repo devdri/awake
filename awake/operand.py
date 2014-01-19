@@ -16,7 +16,6 @@
 
 from . import address
 from . import regutil
-from . import html
 
 class Operand(object):
     bits = 8
@@ -34,8 +33,8 @@ class Operand(object):
         elif self.bits == 1:
             return 1
 
-    def html(self, database):
-        return str(self)
+    def render(self, renderer):
+        renderer.add(str(self))
 
     def optimizedWithContext(self, context):
         return self
@@ -59,8 +58,8 @@ class Constant(Operand):
             return str(self.value)
         return hex(self.value)
 
-    def html(self, database):
-        return html.span(database, self, 'constant')
+    def render(self, renderer):
+        renderer.add(self, 'constant')
 
     def __hash__(self):
         return hash(self.value)
@@ -117,8 +116,8 @@ class AddressConstant(Constant):
             return self.__class__(addr)
         return self
 
-    def html(self, database):
-        return html.addr_link(database, self.link_prefix, self.getAddress(), self.html_class)
+    def render(self, renderer):
+        renderer.addr_link(self.link_prefix, self.getAddress(), self.html_class)
 
 
 class ProcAddress(AddressConstant):
@@ -144,8 +143,8 @@ class Register(Operand):
     def __str__(self):
         return self.name
 
-    def html(self, database):
-        return html.span(database, self, 'register')
+    def render(self, renderer):
+        renderer.add(self, 'register')
 
     def optimizedWithContext(self, ctx):
         if ctx.hasValue(self.name):
@@ -203,8 +202,10 @@ class Dereference(Operand):
     def __str__(self):
         return '[{0}]'.format(self.target)
 
-    def html(self, database):
-        return '[{0}]'.format(self.target.html(database))
+    def render(self, renderer):
+        renderer.add('[')
+        self.target.render(renderer)
+        renderer.add(']')
 
     def optimizedWithContext(self, ctx):
         target = self.target.optimizedWithContext(ctx)
@@ -242,8 +243,12 @@ class ComputedProcAddress(Operand):
     def __str__(self):
         return '[L {0}:{1}]'.format(self.bank, self.addr)
 
-    def html(self, database):
-        return '[L {0}:{1}]'.format(self.bank.html(database), self.addr.html(database))
+    def render(self, renderer):
+        renderer.add('[L ')
+        self.bank.render(renderer)
+        renderer.add(':')
+        self.addr.render(renderer)
+        renderer.add(']')
 
     def optimizedWithContext(self, ctx):
         bank = self.bank.optimizedWithContext(ctx)

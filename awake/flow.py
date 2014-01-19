@@ -388,12 +388,13 @@ class ProcedureFlow(object):
     def tailCalls(self):
         return self._tail_calls
 
-    def html(self, database):
-        out = '<h1>Procedure flow {0}</h1>\n'.format(database.tagdb.nameForAddress(self.addr));
-        out += '<pre class="disasm">\n';
-        out += self.content.html(database)
-        out += '</pre>\n'
-        return out
+    def render(self, renderer):
+        renderer.addLegacy('<h1>Procedure flow ')
+        renderer.nameForAddress(self.addr)
+        renderer.addLegacy('</h1>\n')
+        renderer.addLegacy('<pre class="disasm">\n')
+        self.content.render(renderer)
+        renderer.addLegacy('</pre>\n')
 
     def addToIndex(self, index):
         for x in self.getInstructions():

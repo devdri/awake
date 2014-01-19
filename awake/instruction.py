@@ -19,7 +19,6 @@ from . import regutil
 from . import placeholders
 from . import operand
 from . import address
-from . import html
 from . import depend
 from . import expression
 
@@ -68,11 +67,12 @@ class Instruction(object):
     def splitToSimple(self):
         return [self]
 
-    def html(self, database, indent=0):
-        out = ''
-        operand_html = ', '.join(op.html(database) for op in self.operands())
-        out += html.instruction(database, self.addr, self.name, operand_html, indent, self.signature())
-        return out
+    def render(self, renderer, indent=0):
+        renderer.newInstruction(self.addr, indent)
+        renderer.instructionName(self.name)
+        renderer.add('    ')
+        renderer.renderList(self.operands())
+        renderer.instructionSignature(self.signature())
 
     def hasContinue(self):
         return True
@@ -470,12 +470,12 @@ class LoadInstruction(ExpressionOp):
 
         return LoadInstruction(self.name, target, source, self.addr)
 
-    def html(self, database, indent=0):
-        out = html.span(database, str(self.addr).rjust(9), 'op-addr')
-        out += ' '
-        out += html.span(database, html.pad(database, indent) + self.target.html(database) + ' = ' + self.source.html(database), 'op-name')
-        out += html.span(database, self.signature(), 'op-signature')
-        return out + '\n'
+    def render(self, renderer, indent=0):
+        renderer.newInstruction(self.addr, indent)
+        self.target.render(renderer)
+        renderer.add(' = ')
+        self.source.render(renderer)
+        renderer.instructionSignature(self.signature())
 
     def getMemreads(self):
         out = set()

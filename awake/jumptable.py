@@ -37,12 +37,13 @@ class JumpTable(object):
 
             self.targets.append(operand.ProcAddress(value))
 
-    def html(self, database):
-        out = '<h1>Jump table at ' + str(self.addr) + '</h1>'
-        out += '<pre>'
+    def render(self, renderer):
+        renderer.addLegacy('<h1>Jump table at ' + str(self.addr) + '</h1>')
+        renderer.addLegacy('<pre>')
         i = 0
         for t in self.targets:
-            out += str(i) + ' -> ' + t.html(database) + '\n'
+            renderer.add(str(i) + ' -> ')
+            t.render(renderer)
+            renderer.newline()
             i += 1
-        out += '</pre>'
-        return out
+        renderer.addLegacy('</pre>')

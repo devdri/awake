@@ -65,14 +65,18 @@ class BinOp(Operator):
         except AttributeError:
             return False
 
-    def html(self, database):
-        left = self.left.html(database)
+    def render(self, renderer):
         if self.left.needParen(0):
-            left = '(' + left + ')'
-        right = self.right.html(database)
+            renderer.add('(')
+        self.left.render(renderer)
+        if self.left.needParen(0):
+            renderer.add(')')
+        renderer.add(' '+self.symbol+' ')
         if self.right.needParen(0):
-            right = '(' + right + ')'
-        return '{0} {1} {2}'.format(left, self.symbol, right)
+            renderer.add('(')
+        self.right.render(renderer)
+        if self.right.needParen(0):
+            renderer.add(')')
 
     def needParen(self, priority):
         return True
@@ -375,8 +379,11 @@ class FuncOperator(Operator):
     def __str__(self):
         return '{0}({1})'.format(self.name, ', '.join(str(x) for x in self.childs))
 
-    def html(self, database):
-        return '{0}({1})'.format(self.name, ', '.join(x.html(database) for x in self.childs))
+    def render(self, renderer):
+        renderer.add(self.name)
+        renderer.add('(')
+        renderer.renderList(self.childs)
+        renderer.add(')')
 
     def __hash__(self):
         return hash((self.name, self.args))

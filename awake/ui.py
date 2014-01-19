@@ -24,39 +24,55 @@ from . import procedure
 from . import graph
 from awake.database import Database
 from awake.tag import TagDB
+from awake.textrenderer import HtmlRenderer
 
 def proc_page(addr, out, server):
 
     info = server.database.procInfo(addr)
-    out.write('callers: ' + ', '.join(operand.ProcAddress(x).html(server.database) for x in info.callers) + '<br />')
+
+    renderer = HtmlRenderer(server.database)
+
+    renderer.add('callers: ')
+    renderer.renderList(operand.ProcAddress(x) for x in info.callers)
+    renderer.newline()
 
     flow.refresh(addr, server.database)
     #out += 'deps: ' + str(flow.getProcDepSet(addr)) + '<br />'
-    out.write('calls: ' + ', '.join(operand.ProcAddress(x).html(server.database) for x in flow.at(addr, server.database).calls()) + '<br />')
 
+    renderer.add('calls: ')
+    renderer.renderList(operand.ProcAddress(x) for x in flow.at(addr, server.database).calls())
+    renderer.newline()
 
+    flow.at(addr, server.database).render(renderer)
 
-    out.write(flow.at(addr, server.database).html(server.database))
+    procedure.loadProcedureRange(addr, server.database).render(renderer, server.database)
 
-    out.write(procedure.loadProcedureRange(addr, server.database).html(server.database))
+    out.write(renderer.getContents())
 
 def data_page(addr, server):
     out = ''
 
     reads, writes = server.database.getDataReferers(addr)
 
-    out += '<pre>\n'
-    out += 'reads:\n'
+    renderer = HtmlRenderer(server.database)
+
+    renderer.addLegacy('<pre>\n')
+    renderer.addLegacy('reads:\n')
     for x in reads:
-        out += operand.ProcAddress(x).html(server.database) + '\n'
-    out += 'writes:\n'
+        operand.ProcAddress(x).render(renderer)
+        renderer.newline()
+    renderer.addLegacy('writes:\n')
     for x in writes:
-        out += operand.ProcAddress(x).html(server.database) + '\n'
-    out += '</pre>\n'
-    return out
+        operand.ProcAddress(x).render(renderer)
+        renderer.newline()
+    renderer.addLegacy('</pre>\n')
+
+    return renderer.getContents()
 
 def jumptable_page(addr, server):
-    return jumptable.JumpTable(addr).html(server.database)
+    renderer = HtmlRenderer(server.database)
+    jumptable.JumpTable(addr).render(renderer)
+    return renderer.getContents()
 
 def bank_page(bank, server):
     return server.database.bankReport(bank)
