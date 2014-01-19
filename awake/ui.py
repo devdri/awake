@@ -78,7 +78,7 @@ def name_form(addr, server):
     out = ''
     out += '<form class="name-form" method="get" action="/set-name">'
     out += '<input type="hidden" name="addr" value="{0}" />'.format(addr)
-    out += '<input type="text" name="name" value="{0}" />'.format(server.proj.database.tagdb.nameForAddress(addr))
+    out += '<input type="text" name="name" value="{0}" />'.format(server.proj.database.nameForAddress(addr))
     out += '<input type="submit" value="ok" />'
     out += '</form>'
     return out
@@ -169,7 +169,7 @@ class Handler(BaseHTTPRequestHandler):
             print(p, q)
             addr = address.fromConventional(p['addr'][0])
             name = p['name'][0]
-            self.server.proj.database.tagdb.setNameForAddress(addr, name)
+            self.server.proj.database.setNameForAddress(addr, name)
             self.redirect(self.headers['Referer'])
 
         else:

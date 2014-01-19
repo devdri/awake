@@ -23,10 +23,10 @@ class ExpressionError(Exception):
         self.msg = msg
 
 def operator_priority(symbol):
-    return operator.binary_operators[symbol][0]
+    return binary_operators[symbol][0]
 
 def make_operator(symbol, arg1, arg2):
-    return operator.binary_operators[symbol][1](arg1, arg2)
+    return binary_operators[symbol][1](arg1, arg2)
 
 def arglist(lexer):
     out = [expression(lexer)]
@@ -40,10 +40,10 @@ def arglist(lexer):
     return out
 
 def function(name, args):
-    needed_args = operator.functions[name][1]
+    needed_args = functions[name][1]
     if len(args) != needed_args:
         raise ExpressionError('Expected ' + needed_args + ' args, got ' + len(args))
-    return operator.functions[name][0](*args)
+    return functions[name][0](*args)
 
 def dereference(target):
     return Dereference(target)
@@ -88,7 +88,7 @@ def expression(lexer):
                 lexer.get_token()
                 token += x
 
-        if token in operator.binary_operators:
+        if token in binary_operators:
             if len(stack) > 1 and operator_priority(stack[-2]) >= operator_priority(token):
                 merge_top()
             stack.append(token)
@@ -115,7 +115,7 @@ def term(lexer):
         inner = expression(lexer)
         expect(lexer, ']')
         return dereference(inner)
-    elif token in operator.functions:
+    elif token in functions:
         name = token
         expect(lexer, '(')
         args = arglist(lexer)
@@ -123,7 +123,7 @@ def term(lexer):
         return function(name, args)
     elif re.match('^(0x[0-9a-fA-F]+)|[0-9]+$', token):
         return constant(token)
-    elif token in operator.binary_operators:
+    elif token in binary_operators:
         raise ExpressionError('ERROR: unexpected operator ' + token)
     elif token:
         return register(token)

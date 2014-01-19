@@ -40,7 +40,7 @@ def save_dot(database, procs):
             if info.has_suspicious_instr:
                 tags += ' suspicious'
 
-            f.write('    ' + addr_symbol(addr) + ' [label="' + database.tagdb.nameForAddress(addr) + tags + '"];\n')
+            f.write('    ' + addr_symbol(addr) + ' [label="' + database.nameForAddress(addr) + tags + '"];\n')
             if tags:
                 f.write('    ' + addr_symbol(addr) + ' [color="green"];\n')
 
@@ -108,7 +108,7 @@ def save_dot_for_bank(database, bank):
             if is_public:
                 tags += ' public'
 
-            f.write('    ' + addr_symbol(addr) + ' [label="' + database.tagdb.nameForAddress(addr) + tags + '"];\n')
+            f.write('    ' + addr_symbol(addr) + ' [label="' + database.nameForAddress(addr) + tags + '"];\n')
             f.write('    ' + addr_symbol(addr) + ' [style="filled"];\n')
 
             for c in info.calls:

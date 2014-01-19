@@ -15,17 +15,32 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import sqlite3
+from contextlib import closing
 from awake import address
 from awake.depend import decodeDependencySet, encodeDependencySet, unknownDependencySet
-from awake.tag import TagDB
+from awake.operand import ProcAddress
 from awake.textrenderer import HtmlRenderer
-import procedure
+
+def convert_address(text):
+    return address.fromConventional(text)
+
+def adapt_address(addr):
+    return str(addr)
+
+sqlite3.register_converter('address', convert_address)
+sqlite3.register_adapter(address.Address, adapt_address)
+
+def getFirst(x, alt=None):
+    if x:
+        return x[0]
+    else:
+        return alt
 
 class ProcInfo(object):
     def __init__(self, connection, addr, result=None):
 
         c = connection.cursor()
-        c.execute('select type, depset, has_switch, suspicious_switch, has_suspicious_instr, has_nop, has_ambig_calls, length from procs where addr=?', (str(addr),))
+        c.execute('select type, depset, has_switch, suspicious_switch, has_suspicious_instr, has_nop, has_ambig_calls, length from procs where addr=?', (addr,))
         assert c.rowcount <= 1
         result = c.fetchone()
 
@@ -51,48 +66,48 @@ class ProcInfo(object):
 
         self.calls = set()
         self.tail_calls = set()
-        c.execute('select destination, type from calls where source=?', (str(addr),))
-        for x in c.fetchall():
-            if x[1] == 'tail':
-                self.tail_calls.add(address.fromConventional(x[0]))
+        c.execute('select destination, type from calls where source=?', (addr,))
+        for dest, calltype in c.fetchall():
+            if calltype == 'tail':
+                self.tail_calls.add(dest)
             else:
-                self.calls.add(address.fromConventional(x[0]))
+                self.calls.add(dest)
 
         self.memreads = set()
         self.memwrites = set()
-        c.execute('select addr, type from memref where proc=?', (str(addr),))
-        for x in c.fetchall():
-            if x[1] == 'read':
-                self.memreads.add(address.fromConventional(x[0]))
+        c.execute('select addr, type from memref where proc=?', (addr,))
+        for addr, reftype in c.fetchall():
+            if reftype == 'read':
+                self.memreads.add(addr)
             else:
-                self.memwrites.add(address.fromConventional(x[0]))
+                self.memwrites.add(addr)
 
         self.callers = set()
-        c.execute('select source from calls where destination=?', (str(addr),))
-        for x in c.fetchall():
-            self.callers.add(address.fromConventional(x[0]))
+        c.execute('select source from calls where destination=?', (addr,))
+        for src, in c.fetchall():
+            self.callers.add(src)
 
         c.close()
 
     def save(self, connection):
         c = connection.cursor()
-        c.execute('select addr from procs where addr=?', (str(self.addr),))
+        c.execute('select addr from procs where addr=?', (self.addr,))
         if not c.fetchone():
-            c.execute('insert into procs(addr) values (?)', (str(self.addr),))
+            c.execute('insert into procs(addr) values (?)', (self.addr,))
         c.execute('update procs set type=?, depset=?, has_switch=?, suspicious_switch=?, has_suspicious_instr=? , has_nop=?, has_ambig_calls=?, length=? where addr=?',
-                  (self.type, encodeDependencySet(self.depset), int(self.has_switch), int(self.suspicious_switch), int(self.has_suspicious_instr), int(self.has_nop), int(self.has_ambig_calls), self.length, str(self.addr)))
+                  (self.type, encodeDependencySet(self.depset), int(self.has_switch), int(self.suspicious_switch), int(self.has_suspicious_instr), int(self.has_nop), int(self.has_ambig_calls), self.length, self.addr))
 
-        c.execute('delete from calls where source=?', (str(self.addr),))
-        c.execute('delete from memref where proc=?', (str(self.addr),))
+        c.execute('delete from calls where source=?', (self.addr,))
+        c.execute('delete from memref where proc=?', (self.addr,))
 
         for x in self.calls:
-            c.execute('insert into calls(source, destination, type) values (?, ?, "call")', (str(self.addr), str(x)))
+            c.execute('insert into calls(source, destination, type) values (?, ?, "call")', (self.addr, x))
         for x in self.tail_calls:
-            c.execute('insert into calls(source, destination, type) values (?, ?, "tail")', (str(self.addr), str(x)))
+            c.execute('insert into calls(source, destination, type) values (?, ?, "tail")', (self.addr, x))
         for x in self.memreads:
-            c.execute('insert into memref(addr, proc, type) values (?, ?, "read")', (str(x), str(self.addr)))
+            c.execute('insert into memref(addr, proc, type) values (?, ?, "read")', (x, self.addr))
         for x in self.memwrites:
-            c.execute('insert into memref(addr, proc, type) values (?, ?, "write")', (str(x), str(self.addr)))
+            c.execute('insert into memref(addr, proc, type) values (?, ?, "write")', (x, self.addr))
         c.close()
         connection.commit()
 
@@ -100,21 +115,68 @@ class ProcInfo(object):
         pass
 
 class Database(object):
-    def __init__(self, filename):
-        self.connection = sqlite3.connect(filename)
-        self.init()
-        self.tagdb = TagDB("data/tags.db")
+    default_tags = {
+        'IO:FF04': 'IO:DIV',
+        'IO:FF05': 'IO:TIMA',
+        'IO:FF06': 'IO:TMA',
+        'IO:FF07': 'IO:TAC',
+        'IO:FF40': 'IO:LCDC',
+        'IO:FF41': 'IO:STAT',
+        'IO:FF42': 'IO:SCY',
+        'IO:FF43': 'IO:SCX',
+        'IO:FF44': 'IO:LY',
+        'IO:FF45': 'IO:LYC',
+        'IO:FF46': 'IO:DMA',
+        'IO:FF47': 'IO:BGP',
+        'IO:FF48': 'IO:OBP0',
+        'IO:FF49': 'IO:OBP1',
+        'IO:FF4A': 'IO:WY',
+        'IO:FF4B': 'IO:WX',
+        'IO:FFFF': 'IO:IE',
+        'IO:FF0F': 'IO:IF',
+    }
 
-    def init(self):
+    def __init__(self, filename):
+        self.connection = sqlite3.connect(filename, detect_types=sqlite3.PARSE_DECLTYPES)
+
         c = self.connection.cursor()
-        c.execute('create table if not exists procs(addr text, type text, depset text, has_switch integer, suspicious_switch integer, has_suspicious_instr integer, has_nop integer, has_ambig_calls integer, length integer)')
-        c.execute('create table if not exists calls(source text, destination text, type text)')
-        c.execute('create table if not exists memref(addr text, proc text, type text)')
+        c.execute('create table if not exists procs(addr address, type text, depset text, has_switch integer, suspicious_switch integer, has_suspicious_instr integer, has_nop integer, has_ambig_calls integer, length integer)')
+        c.execute('create table if not exists calls(source address, destination address, type text)')
+        c.execute('create table if not exists memref(addr address, proc text, type text)')
+        c.execute('create table if not exists tags(addr address, name text)')
         c.close()
         self.connection.commit()
 
     def close(self):
         self.connection.close()
+
+    def hasNameForAddress(self, addr):
+        if str(addr) in self.default_tags:
+            return True
+
+        with closing(self.connection.cursor()) as c:
+            c.execute('select name from tags where addr=?', (addr,))
+            return bool(getFirst(c.fetchone()))
+
+    def nameForAddress(self, addr):
+        if str(addr) in self.default_tags:
+            return self.default_tags[str(addr)]
+
+        with closing(self.connection.cursor()) as c:
+            c.execute('select name from tags where addr=?', (addr,))
+            return getFirst(c.fetchone(), str(addr))
+
+    def setNameForAddress(self, addr, name):
+        c = self.connection.cursor()
+        c.execute('select name from tags where addr=?', (addr,))
+        if c.fetchone():
+            print('updating')
+            c.execute('update tags set name=? where addr=?', (name, addr))
+        else:
+            print('new')
+            c.execute('insert into tags (addr, name) values (?, ?)', (addr, name))
+        c.close()
+        self.connection.commit()
 
     def procInfo(self, addr):
         return ProcInfo(self.connection, addr)
@@ -123,103 +185,73 @@ class Database(object):
         procInfo(self.connection, addr).save(self.connection)
 
     def getNextOwnedAddress(self, addr):
-        c = self.connection.cursor()
-        c.execute('select addr from procs where addr > ? order by addr', (str(addr),))
-        result = c.fetchone()
-        c.close()
-        if not result:
-            return None
-        return address.fromConventional(result[0])
+        with closing(self.connection.cursor()) as c:
+            c.execute('select addr from procs where addr > ? order by addr', (addr,))
+            return getFirst(c.fetchone())
 
     def getUnfinished(self):
-        c = self.connection.cursor()
-        c.execute('select addr from procs where has_ambig_calls=1 and suspicious_switch=0 and has_suspicious_instr=0')
-        out = list()
-        for result in c.fetchall():
-            addr = address.fromConventional(result[0])
-            out.append(addr)
-        c.close()
-        return out
+        with closing(self.connection.cursor()) as c:
+            c.execute('select addr from procs where has_ambig_calls=1 and suspicious_switch=0 and has_suspicious_instr=0')
+            return [x[0] for x in c.fetchall()]
 
     def getAll(self):
-        c = self.connection.cursor()
-        c.execute('select addr from procs order by addr')
-        out = list()
-        for result in c.fetchall():
-            addr = address.fromConventional(result[0])
-            out.append(addr)
-        c.close()
-        return out
+        with closing(self.connection.cursor()) as c:
+            c.execute('select addr from procs order by addr')
+            return [x[0] for x in c.fetchall()]
 
     def getAllInBank(self, bank):
         bank_name = "{:04X}".format(bank)
-
-        c = self.connection.cursor()
-        c.execute('select addr from procs where substr(addr, 0, 5)=? order by addr', (bank_name,))
-        out = list()
-        for result in c.fetchall():
-            addr = address.fromConventional(result[0])
-            out.append(addr)
-        c.close()
-        return out
+        with closing(self.connection.cursor()) as c:
+            c.execute('select addr from procs where substr(addr, 0, 5)=? order by addr', (bank_name,))
+            return [x[0] for x in c.fetchall()]
 
     def setInitial(self, initial):
         c = self.connection.cursor()
-        for x in initial:
-            c.execute('insert into calls(source, destination) values ("FFFF:0000", ?)', (str(x),))
+        c.executemany('insert into calls(source, destination) values ("FFFF:0000", ?)', ((x,) for x in initial))
         c.close()
         self.connection.commit()
 
     def getInteresting(self):
-        from . import operand
-
         renderer = HtmlRenderer(self)
 
         c = self.connection.cursor()
         c.execute('select addr from procs where has_ambig_calls=1')
         renderer.add('ambig calls:\n')
-        for result in c.fetchall():
-            addr = address.fromConventional(result[0])
+        for addr, in c.fetchall():
             renderer.pad(1)
-            operand.ProcAddress(addr).render(renderer)
+            ProcAddress(addr).render(renderer)
             renderer.newline()
         c.execute('select addr from procs where suspicious_switch=1')
         renderer.add('suspicious switch:\n')
-        for result in c.fetchall():
-            addr = address.fromConventional(result[0])
+        for addr, in c.fetchall():
             renderer.pad(1)
-            operand.ProcAddress(addr).render(renderer)
+            ProcAddress(addr).render(renderer)
             renderer.newline()
         c.execute('select addr from procs where has_suspicious_instr=1')
         renderer.add('suspicious instr:\n')
-        for result in c.fetchall():
-            addr = address.fromConventional(result[0])
+        for addr, in c.fetchall():
             renderer.pad(1)
-            operand.ProcAddress(addr).render(renderer) + '\n'
+            ProcAddress(addr).render(renderer) + '\n'
             renderer.newline()
         c.close()
         return '<pre>' + renderer.getContents() + '</pre>'
 
     def getAmbigCalls(self):
-        out = set()
-        c = self.connection.cursor()
-        c.execute('select addr from procs where has_ambig_calls=1')
-        for result in c.fetchall():
-            addr = address.fromConventional(result[0])
-            out.add(addr)
-        return out
+        with closing(self.connection.cursor()) as c:
+            c.execute('select addr from procs where has_ambig_calls=1')
+            return [x[0] for x in c.fetchall()]
 
     def getDataReferers(self, data_addr):
         reads = set()
         writes = set()
         c = self.connection.cursor()
-        c.execute('select proc, type from memref where addr=?', (str(data_addr),))
-        for result in c.fetchall():
-            addr = address.fromConventional(result[0])
-            if result[1] == 'read':
+        c.execute('select proc, type from memref where addr=?', (data_addr,))
+        for addr, reftype in c.fetchall():
+            if reftype == 'read':
                 reads.add(addr)
             else:
                 writes.add(addr)
+        c.close()
         return reads, writes
 
     def produce_map(self, proj):
@@ -249,10 +281,7 @@ class Database(object):
 
         c = self.connection.cursor()
         c.execute('select addr, length from procs order by addr')
-        for result in c.fetchall():
-            addr = address.fromConventional(result[0])
-            length = result[1]
-
+        for addr, length in c.fetchall():
             for i in range(length):
                 byte_addr = addr.offset(i).physical()
 
@@ -267,7 +296,6 @@ class Database(object):
         print('image saved')
 
     def bankReport(self, bank):
-        from . import operand
         bank_name = "{:04X}".format(bank)
 
         renderer = HtmlRenderer(self)
@@ -276,34 +304,30 @@ class Database(object):
 
         renderer.add('public interface:\n')
         c.execute('select destination from calls where substr(source, 0, 5)<>? and substr(destination, 0, 5)=? group by destination order by destination', (bank_name, bank_name))
-        for result in c.fetchall():
-            addr = address.fromConventional(result[0])
+        for addr, in c.fetchall():
             renderer.pad(1)
-            operand.ProcAddress(addr).render(renderer) + '\n'
+            ProcAddress(addr).render(renderer) + '\n'
             renderer.newline()
 
         renderer.add('dependencies:\n')
         c.execute('select destination from calls where substr(source, 0, 5)=? and substr(destination, 0, 5)<>? group by source order by source', (bank_name, bank_name))
-        for result in c.fetchall():
-            addr = address.fromConventional(result[0])
+        for addr, in c.fetchall():
             renderer.pad(1)
-            operand.ProcAddress(addr).render(renderer) + '\n'
+            ProcAddress(addr).render(renderer) + '\n'
             renderer.newline()
 
         renderer.add('reads:\n')
         c.execute('select addr from memref where substr(proc, 0, 5)=? and type=? group by addr order by addr', (bank_name, 'read'))
-        for result in c.fetchall():
-            addr = address.fromConventional(result[0])
+        for addr, in c.fetchall():
             renderer.pad(1)
-            operand.DataAddress(addr).render(renderer) + '\n'
+            DataAddress(addr).render(renderer) + '\n'
             renderer.newline()
 
         renderer.add('writes:\n')
         c.execute('select addr from memref where substr(proc, 0, 5)=? and type=? group by addr order by addr', (bank_name, 'write'))
-        for result in c.fetchall():
-            addr = address.fromConventional(result[0])
+        for addr, in c.fetchall():
             renderer.pad(1)
-            operand.DataAddress(addr).render(renderer) + '\n'
+            DataAddress(addr).render(renderer) + '\n'
             renderer.newline()
 
         c.close()

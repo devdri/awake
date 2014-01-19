@@ -74,7 +74,7 @@ class Address(object):
 
 
     def __init__(self, address):
-        self.address = address
+        self.address = int(address)
 
 
     def virtual(self):

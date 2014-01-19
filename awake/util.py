@@ -55,9 +55,8 @@ class RadioGroup(ttk.LabelFrame):
         return self.var.get()
 
 class BankSelect(ttk.Combobox):
-    def __init__(self, parent, includeAny=False):
-        from awake import disasm
-        num_banks = disasm.rom.numBanks()
+    def __init__(self, parent, proj, includeAny=False):
+        num_banks = proj.rom.numBanks()
         banks = [('Bank {:02X}'.format(x), x) for x in range(num_banks)]
         self.textToBank = dict(banks)
         values = [x[0] for x in banks]

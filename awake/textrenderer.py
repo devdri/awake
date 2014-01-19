@@ -53,10 +53,10 @@ class HtmlRenderer(object):
         self.add('    ' * num)
 
     def addr_link(self, prefix, addr, klass):
-        self.add('<a class="{0}" href="{1}{2}">{3}</a>'.format(klass, prefix, addr, self.database.tagdb.nameForAddress(addr)))
+        self.add('<a class="{0}" href="{1}{2}">{3}</a>'.format(klass, prefix, addr, self.database.nameForAddress(addr)))
 
     def label(self, addr):
-        self.content.append('<a name="{0}">label_{1}</a>:\n'.format(addr, self.database.tagdb.nameForAddress(addr)))
+        self.content.append('<a name="{0}">label_{1}</a>:\n'.format(addr, self.database.nameForAddress(addr)))
 
     def newInstruction(self, addr):
         if not self.emptyLine:
@@ -90,4 +90,4 @@ class HtmlRenderer(object):
                 self.add(el)
 
     def nameForAddress(self, addr):
-        self.add(self.database.tagdb.nameForAddress(addr))
+        self.add(self.database.nameForAddress(addr))

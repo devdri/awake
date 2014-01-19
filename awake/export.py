@@ -38,7 +38,7 @@ class ExportTask(AsyncTask):
 
     def __init__(self, rom_file, scope='all', mode='flow', bank=None, address=None, filename=''):
         super(ExportTask, self).__init__()
-        self.rom_file = rom_filw
+        self.rom_file = rom_file
         self.scope = scope
         self.mode = mode
         self.bank = bank
@@ -92,8 +92,8 @@ class ExportTask(AsyncTask):
                 renderer = HtmlRenderer(database)
 
                 if self.mode == 'symbols':
-                    if database.tagdb.hasNameForAddress(addr):
-                        renderer.add(str(addr) + ' ' + database.tagdb.nameForAddress(addr))
+                    if database.hasNameForAddress(addr):
+                        renderer.add(str(addr) + ' ' + database.nameForAddress(addr))
                     else:
                         renderer.add(str(addr))
                 elif self.mode == 'basic':
@@ -116,7 +116,8 @@ class ExportDialog(tk.Toplevel):
             parent = getTkRoot()
         tk.Toplevel.__init__(self, parent)
 
-        self.task = ExportTask('roms/zelda.gb')
+        self.proj = Project('roms/zelda.gb')
+        self.task = ExportTask(self.proj.filename)
 
         self.resizable(False, False)
         self.title('Awake Export')
@@ -134,7 +135,7 @@ class ExportDialog(tk.Toplevel):
         radio.grid(row=1, column=1, columnspan=2, sticky='NESW')
         radio = ttk.Radiobutton(group, text='Single bank', variable=self.scope_var, value='bank')
         radio.grid(row=2, column=1, sticky='NESW')
-        self.bank_select = BankSelect(group)
+        self.bank_select = BankSelect(group, self.proj)
         self.bank_select.var.trace('w', self.enableBank)
         self.bank_select.grid(row=2, column=2, sticky='NESW')
         radio = ttk.Radiobutton(group, text='Single procedure', variable=self.scope_var, value='proc')

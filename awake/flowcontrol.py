@@ -16,7 +16,7 @@
 
 from awake import address, placeholders
 from awake.context import Context
-from awake.depend import DependencySet, dependParallel, unknownDependencySet
+from awake.depend import DependencySet, dependParallel, joinDependencies, unknownDependencySet
 from awake.instruction import BaseOp, Instruction
 from awake.operand import AddressConstant, Constant, JumpTableAddress, LabelAddress
 from awake.regutil import ALL_REGS, joinRegisters

@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from awake.regutil import joinRegisters, ALL_REGS
+from awake.regutil import joinRegisters, splitRegisters, ALL_REGS
 
 def joinDependencies(first, second):
     reads = second.reads - first.writes | first.reads
