@@ -19,8 +19,7 @@ import Tkinter as tk
 import ttk
 from awake import procedure
 from awake.util import AsyncTask, getTkRoot
-from awake.database import Database, setGlobalDatabase
-from awake.tag import setGlobalTagDB, TagDB
+from awake.database import Database
 from awake import ui
 from BaseHTTPServer import HTTPServer
 import httplib
@@ -55,16 +54,13 @@ class ServerTask(AsyncTask):
         self.report("Loading databases")
 
         database = Database('data/xxx.db')
-        setGlobalDatabase(database)
-        tags = TagDB('data/tags.db')
-        setGlobalTagDB(tags)
 
         self.server = StoppableHTTPServer(('', self.port), StoppableHandler)
+        self.server.database = database
         self.report("Running server...")
         self.server.serve_forever()
 
         database.close()
-        tags.close()
 
         self.report("Server stopped.")
 

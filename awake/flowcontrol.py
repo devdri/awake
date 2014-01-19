@@ -69,7 +69,7 @@ class Label(instruction.BaseOp):
         ins = regutil.joinRegisters(self.needed - set(['mem']))
         return ' @ ' + ', '.join(sorted(str(x) for x in ins if not isinstance(x, address.Address)))
 
-    def html(self, indent=0, labels=None):
+    def html(self, database, indent=0, labels=None):
         if not self.gotos:
             return ''
         return '<a name="{0}">label_{1}</a>: {2}\n'.format(self.addr, self.addr, self.signature())
@@ -176,8 +176,8 @@ class Block(instruction.Instruction):
             return True
         return self.contents[-1].hasContinue()
 
-    def html(self, indent=0):
-        return ''.join(el.html(indent) for el in self.contents)
+    def html(self, database, indent=0):
+        return ''.join(el.html(database, indent) for el in self.contents)
 
     def __str__(self):
         return 'block'+str(len(self.contents))+':'+str(bool(self))+'(' + ','.join(sorted(str(el) for el in self.contents)) + ')'
@@ -232,12 +232,12 @@ class Switch(instruction.Instruction):
     def valueForBranch(self, i):
         return operand.Constant(self.base_value + i)
 
-    def html(self, indent):
-        out = html.instruction(self.addr, 'switch ('+self.arg.html()+', '+self.jtAddr.html()+') {', '', indent)
+    def html(self, database, indent):
+        out = html.instruction(database, self.addr, 'switch ('+self.arg.html(database)+', '+self.jtAddr.html(database)+') {', '', indent)
         for (i, b) in enumerate(self.branches):
-            out += html.instruction(self.addr, 'case '+self.valueForBranch(i).html()+':', '', indent)
-            out += b.html(indent+1)
-        out += html.instruction(self.addr, '}', '', indent)
+            out += html.instruction(database, self.addr, 'case '+self.valueForBranch(i).html(database)+':', '', indent)
+            out += b.html(database, indent+1)
+        out += html.instruction(database, self.addr, '}', '', indent)
         return out
 
     def getInstructions(self, out):
@@ -300,22 +300,22 @@ class If(instruction.Instruction):
             return True
         return self.option_a.hasContinue() or self.option_b.hasContinue()
 
-    def html(self, indent):
+    def html(self, database, indent):
         addr = self.addr
-        out = html.instruction(addr, 'if ('+self.cond.html()+') {', '', indent)
+        out = html.instruction(database, addr, 'if ('+self.cond.html(database)+') {', '', indent)
 
         if not self.option_a and not self.option_b:
-            out += html.instruction(addr, 'WARN: empty if', '', indent)
+            out += html.instruction(database, addr, 'WARN: empty if', '', indent)
         elif not self.option_a:
-            out += self.option_b.html(indent+1)
+            out += self.option_b.html(database, indent+1)
         else:
-            out += self.option_a.html(indent+1)
+            out += self.option_a.html(database, indent+1)
 
         if self.option_b and self.option_a:
-            out += html.instruction(addr, '} else {', '', indent)
-            out += self.option_b.html(indent+1)
+            out += html.instruction(database, addr, '} else {', '', indent)
+            out += self.option_b.html(database, indent+1)
 
-        out += html.instruction(addr, '}', '', indent)
+        out += html.instruction(database, addr, '}', '', indent)
         return out
 
     def optimizedWithContext(self, ctx):
@@ -399,11 +399,11 @@ class DoWhile(LoopWhile):
         self.continue_label = continue_label
         continue_label.addContinue(self)
 
-    def html(self, indent):
+    def html(self, database, indent):
         addr = "0000:0000"  # TODO: inner first addr
-        out = html.instruction(addr, 'do {', '', indent, self.signature())
-        out += self.inner.html(indent+1)
-        out += html.instruction(addr, '} while ('+self.postcond.html()+')', '', indent)
+        out = html.instruction(database, addr, 'do {', '', indent, self.signature())
+        out += self.inner.html(database, indent+1)
+        out += html.instruction(database, addr, '} while ('+self.postcond.html(database)+')', '', indent)
         return out
 
     def optimizedWithContext(self, ctx):
@@ -456,11 +456,11 @@ class While(LoopWhile):
         self.continue_label = continue_label
         continue_label.addContinue(self)
 
-    def html(self, indent):
+    def html(self, database, indent):
         addr = "0000:0000"  # TODO: inner first addr
-        out = html.instruction(addr, 'while (1) {', '', indent, self.signature())
-        out += self.inner.html(indent+1)
-        out += html.instruction(addr, '}', '', indent)
+        out = html.instruction(database, addr, 'while (1) {', '', indent, self.signature())
+        out += self.inner.html(database, indent+1)
+        out += html.instruction(database, addr, '}', '', indent)
         return out
 
     def hasContinue(self):

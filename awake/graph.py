@@ -15,21 +15,19 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from collections import defaultdict
-from awake.tag import getGlobalTagDB
 from PIL import Image
 from . import address
 
 def addr_symbol(addr):
     return 'A' + str(addr).replace(':', '_')
 
-def save_dot(procs):
+def save_dot(database, procs):
     with open('data/graph.dot', 'w') as f:
         f.write("digraph crossref {\n")
         for addr in procs:
             tags = ''
 
-            from awake.database import getGlobalDatabase
-            info = getGlobalDatabase().procInfo(addr)
+            info = database.procInfo(addr)
 
             if info.has_switch:
                 tags += ' switch'
@@ -42,7 +40,7 @@ def save_dot(procs):
             if info.has_suspicious_instr:
                 tags += ' suspicious'
 
-            f.write('    ' + addr_symbol(addr) + ' [label="' + getGlobalTagDB().nameForAddress(addr) + tags + '"];\n')
+            f.write('    ' + addr_symbol(addr) + ' [label="' + database.tagdb.nameForAddress(addr) + tags + '"];\n')
             if tags:
                 f.write('    ' + addr_symbol(addr) + ' [color="green"];\n')
 
@@ -73,21 +71,19 @@ def save_dot(procs):
 )
         f.write("}\n")
 
-def save_dot_for_bank(bank):
+def save_dot_for_bank(database, bank):
     bank_name = '{:04X}'.format(bank)
 
     with open('data/bank'+bank_name+'.dot', 'w') as f:
         f.write("digraph crossref {\n")
 
-        from awake.database import getGlobalDatabase
-        cur = getGlobalDatabase().connection.cursor()
+        cur = database.connection.cursor()
         cur.execute('select addr from procs where substr(addr, 0, 5)=?', (bank_name,))
         for proc_result in cur.fetchall():
             addr = address.fromConventional(proc_result[0])
             tags = ''
 
-            from awake.database import getGlobalDatabase
-            info = getGlobalDatabase().procInfo(addr)
+            info = database.procInfo(addr)
 
             is_public = False
 
@@ -112,7 +108,7 @@ def save_dot_for_bank(bank):
             if is_public:
                 tags += ' public'
 
-            f.write('    ' + addr_symbol(addr) + ' [label="' + getGlobalTagDB().nameForAddress(addr) + tags + '"];\n')
+            f.write('    ' + addr_symbol(addr) + ' [label="' + database.tagdb.nameForAddress(addr) + tags + '"];\n')
             f.write('    ' + addr_symbol(addr) + ' [style="filled"];\n')
 
             for c in info.calls:
@@ -164,23 +160,22 @@ def produce_map(ownership):
     print('image saved')
 
 
-def getSubgraph(start_points):
+def getSubgraph(database, start_points):
     queue = set(start_points)
     verts = set()
 
-    from awake.database import getGlobalDatabase
     while queue:
         x = queue.pop()
         if x in verts:
             continue
 
         verts.add(x)
-        info = getGlobalDatabase().procInfo(x)
+        info = database.procInfo(x)
         for c in info.calls:
             queue.add(c)
     return verts
 
-def search():
+def search(database):
     """
     input = [
 address.fromConventional("0003:6A4B"),
@@ -432,11 +427,9 @@ address.fromConventional("0002:5DD5"),
 address.fromConventional("0002:5731"),
 ]
 
-    from awake.database import getGlobalDatabase
-
     #database.setInitial(input)
 
-    input = getGlobalDatabase().getAll()
+    input = database.getAll()
     #input = database.getUnfinished()
 
     input = [address.fromConventional("0000:345B")]
@@ -457,11 +450,11 @@ address.fromConventional("0002:5731"),
         from . import flow
         flow.refresh(x)
 
-        calls = flow.at(x).calls() | flow.at(x).tailCalls()
+        calls = flow.at(x, database).calls() | flow.at(x).tailCalls()
         for c in calls:
             callers[c].add(x)
             if c not in procs:
-                getGlobalDatabase().reportProc(c)
+                database.reportProc(c)
                 procs.add(c)
                 to_update.insert(0, c)
 
@@ -472,5 +465,5 @@ address.fromConventional("0002:5731"),
         #to_update = list(affected - set(to_update)) + to_update
 
     print('saving dot')
-    save_dot(procs)
+    save_dot(database, procs)
     print('saved dot')

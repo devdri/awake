@@ -14,13 +14,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from awake.database import getGlobalDatabase
 from . import disasm
 from . import address
 from . import html
 from . import instruction
 from . import operand
-from awake.tag import getGlobalTagDB
 from collections import defaultdict
 
 def manualJumptableLimit(addr):
@@ -81,7 +79,7 @@ def manualJumptableLimit(addr):
 
 class ProcedureRangeAnalysis(object):
 
-    def __init__(self, addr, limit):
+    def __init__(self, database, addr, limit):
         self.start_addr = addr
         self.limit_addr = limit
         self.visited = set()
@@ -94,7 +92,7 @@ class ProcedureRangeAnalysis(object):
         self.suspicious_switch = False
         self.warn = False
         self.log = list()
-        self.dfs()
+        self.dfs(database)
         self.shrinkLimitAndCut(self.firstGap())
 
     def isLocalAddr(self, addr):
@@ -154,7 +152,7 @@ class ProcedureRangeAnalysis(object):
         self.labels.add(next_target)
         self.block_starts.add(next_target)
 
-    def visitInstruction(self, addr):
+    def visitInstruction(self, database, addr):
 
         if addr in self.visited or not self.isLocalAddr(addr):
             return
@@ -164,7 +162,7 @@ class ProcedureRangeAnalysis(object):
 
         self.visited.add(addr)
 
-        instr, next_addr = disasm._decode(addr)
+        instr, next_addr = disasm._decode(database, addr)
 
         self.log.append('instr ' + str(addr) + ' ' + str(instr))
 
@@ -195,11 +193,11 @@ class ProcedureRangeAnalysis(object):
             if call_addr != self.start_addr:
                 self.shrinkLimit(call_addr)
 
-    def dfs(self):
+    def dfs(self, database):
         while self.queue or self.jumptable_queue:
             if self.queue:
                 x = self.queue.pop()
-                self.visitInstruction(x)
+                self.visitInstruction(database, x)
             else:
                 x = self.jumptable_queue.pop()
                 self.tryExpandJumptable(x)
@@ -219,28 +217,25 @@ class ProcedureRangeAnalysis(object):
         self.block_starts = set(addr for addr in self.block_starts if self.isLocalAddr(addr))
         self.jumptable_sizes = dict((k, v) for (k, v) in self.jumptable_sizes.items() if self.isLocalAddr(k))
 
-    def html(self):
-        out = '<h1>Procedure {0}</h1>\n'.format(getGlobalTagDB().nameForAddress(self.start_addr));
+    def html(self, database):
+        out = '<h1>Procedure {0}</h1>\n'.format(database.tagdb.nameForAddress(self.start_addr));
         out += '<pre class="disasm">';
         from . import disasm
         for addr in sorted(self.visited):
             if addr in self.labels:
-                out += html.label(addr)
-            out += disasm.decodeCache(addr)[0].html(0)
+                out += html.label(database, addr)
+            out += disasm.decodeCache(database, addr)[0].html(database, 0)
         out += '</pre>\n'
 
         return out
 
-    def procgraph(self):
-        return ProcedureGraph(self.start_addr, self.limit_addr, self.block_starts, self.jumptable_sizes)
-
-def getLimit(addr):
+def getLimit(addr, database):
     if addr.inPhysicalMem():
         bank_limit = address.fromVirtualAndBank(0x4000, addr.bank()+1)
     else:
         bank_limit = address.fromVirtual(0xFFFF)
 
-    next_owned = getGlobalDatabase().getNextOwnedAddress(addr)
+    next_owned = database.getNextOwnedAddress(addr)
 
     if not next_owned or bank_limit < next_owned:
         return bank_limit
@@ -248,7 +243,7 @@ def getLimit(addr):
         return next_owned
 
 class ProcedureGraph(object):
-    def __init__(self, start_addr, end_addr, block_starts, jumptable_sizes):
+    def __init__(self, database, start_addr, end_addr, block_starts, jumptable_sizes):
         self.start_addr = start_addr
         self.end_addr = end_addr
         self.jumptable_sizes = jumptable_sizes
@@ -258,11 +253,11 @@ class ProcedureGraph(object):
         self.block_id_at_addr[None] = None
         self._childs = dict()
         self.blocks = [None] * len(block_starts)
-        self.addBlocks()
+        self.addBlocks(database)
         self._parents = defaultdict(list)
         self._fillParents()
 
-    def addBlocks(self):
+    def addBlocks(self, database):
         num_blocks = len(self.blocks)
         for i in range(num_blocks):
             start_addr = self.block_starts[i]
@@ -270,13 +265,13 @@ class ProcedureGraph(object):
                 end_addr = self.block_starts[i+1]
             else:
                 end_addr = self.end_addr
-            self.addBlock(i, start_addr, end_addr)
+            self.addBlock(database, i, start_addr, end_addr)
 
-    def addFakeBlock(self, addr):
+    def addFakeBlock(self, database, addr):
         pos = len(self.blocks)
         self.block_id_at_addr[addr] = pos
 
-        instr = instruction.TailCall(operand.ProcAddress(addr))
+        instr = instruction.TailCall(database, operand.ProcAddress(addr))
 
         from .flowcontrol import Block
         self.blocks.append(Block([instr]))
@@ -284,12 +279,12 @@ class ProcedureGraph(object):
         self.block_starts.append(addr)
         self._childs[pos] = [None]
 
-    def addBlock(self, pos, start_addr, end_addr):
+    def addBlock(self, database, pos, start_addr, end_addr):
 
         instructions = []
         addr = start_addr
         while addr < end_addr:
-            instr, addr = disasm.decodeCache(addr)
+            instr, addr = disasm.decodeCache(database, addr)
             instructions.append(instr)
             if not instr.hasContinue():
                 break
@@ -326,7 +321,7 @@ class ProcedureGraph(object):
         for ch in childs:
             if ch not in self.block_starts:
                 if ch is not None:
-                    self.addFakeBlock(ch)
+                    self.addFakeBlock(database, ch)
 
         self._childs[self.block_id_at_addr[start_addr]] = [self.block_id_at_addr[ch] for ch in childs]
 
@@ -372,13 +367,13 @@ class ProcedureGraph(object):
     def getProcLength(self):
         return self.end_addr.virtual() - self.start_addr.virtual()
 
-    def html(self):
+    def html(self, database):
         out = ''
-        out += 'Proc graph ' + getGlobalTagDB().nameForAddress(self.start_addr)
+        out += 'Proc graph ' + database.tagdb.nameForAddress(self.start_addr)
         out += '<pre class="disasm">'
         for i, b in enumerate(self.blocks):
             out += 'BLOCK' + str(i) + '\n'
-            out += b.html()
+            out += b.html(database)
         out += 'edges:\n'
         for x in self.vertices():
             out += str(x) + ' -> ' + ', '.join(str(y) for y in self.childs(x)) + '\n'
@@ -386,12 +381,12 @@ class ProcedureGraph(object):
         return out
 
 
-def loadProcedureRange(addr):
-    return ProcedureRangeAnalysis(addr, getLimit(addr))
+def loadProcedureRange(addr, database):
+    return ProcedureRangeAnalysis(database, addr, getLimit(addr, database))
 
-def loadProcedureGraph(addr):
-    r = loadProcedureRange(addr)
-    g = ProcedureGraph(addr, r.limit_addr, r.block_starts, r.jumptable_sizes)
+def loadProcedureGraph(addr, database):
+    r = loadProcedureRange(addr, database)
+    g = ProcedureGraph(database, addr, r.limit_addr, r.block_starts, r.jumptable_sizes)
     g.suspicious_switch = r.suspicious_switch
     g.warn = r.warn
     return g

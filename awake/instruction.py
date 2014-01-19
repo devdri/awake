@@ -21,7 +21,6 @@ from . import operand
 from . import address
 from . import html
 from . import depend
-from awake.database import getGlobalDatabase
 from . import expression
 
 class Instruction(object):
@@ -69,10 +68,10 @@ class Instruction(object):
     def splitToSimple(self):
         return [self]
 
-    def html(self, indent=0):
+    def html(self, database, indent=0):
         out = ''
-        operand_html = ', '.join(op.html() for op in self.operands())
-        out += html.instruction(self.addr, self.name, operand_html, indent, self.signature())
+        operand_html = ', '.join(op.html(database) for op in self.operands())
+        out += html.instruction(database, self.addr, self.name, operand_html, indent, self.signature())
         return out
 
     def hasContinue(self):
@@ -223,7 +222,7 @@ class JumpInstruction(Instruction):
 
 
 class CallInstruction(Instruction):
-    def __init__(self, name, target, cond, addr):
+    def __init__(self, database, name, target, cond, addr):
         super(CallInstruction, self).__init__(name, addr)
 
         # XXX: IDIOM [CALL HL]
@@ -249,6 +248,8 @@ class CallInstruction(Instruction):
             self.targetAddr = address.fromVirtual(0x4000)  # XXX: ambiguous address
             self.target = target
 
+        self.target_depset = database.procInfo(self.targetAddr).depset
+
         self.returns_used = regutil.ALL_REGS
         self.constant_params = dict()
 
@@ -258,12 +259,11 @@ class CallInstruction(Instruction):
         return (needed - deps.writes) | deps.reads
 
     def getDependencySet(self):
-        deps = getGlobalDatabase().procInfo(self.targetAddr).depset
-        reads = set(deps.reads)
+        reads = set(self.target_depset.reads)
         for r in regutil.joinRegisters(reads):
             if r in self.constant_params:
                 reads -= regutil.splitRegister(r)
-        return depend.DependencySet(reads, deps.writes)
+        return depend.DependencySet(reads, self.target_depset.writes)
 
     def optimizeDependencies(self, needed):
         self.returns_used = needed & self.getDependencySet().writes
@@ -336,8 +336,8 @@ class CallInstruction(Instruction):
 
 
 class TailCall(CallInstruction):
-    def __init__(self, target):
-        super(TailCall, self).__init__('tail-call', target, placeholders.ALWAYS, target.getAddress())
+    def __init__(self, database, target):
+        super(TailCall, self).__init__(database, 'tail-call', target, placeholders.ALWAYS, target.getAddress())
 
 
 class SwitchInstruction(BaseOp):
@@ -470,11 +470,11 @@ class LoadInstruction(ExpressionOp):
 
         return LoadInstruction(self.name, target, source, self.addr)
 
-    def html(self, indent=0):
-        out = html.span(str(self.addr).rjust(9), 'op-addr')
+    def html(self, database, indent=0):
+        out = html.span(database, str(self.addr).rjust(9), 'op-addr')
         out += ' '
-        out += html.span(html.pad(indent) + self.target.html() + ' = ' + self.source.html(), 'op-name')
-        out += html.span(self.signature(), 'op-signature')
+        out += html.span(database, html.pad(database, indent) + self.target.html(database) + ' = ' + self.source.html(database), 'op-name')
+        out += html.span(database, self.signature(), 'op-signature')
         return out + '\n'
 
     def getMemreads(self):
@@ -493,7 +493,7 @@ class LoadInstruction(ExpressionOp):
             return set()
 
 
-def make(name, operands, addr, reads, writes, values, loads):
+def make(database, name, operands, addr, reads, writes, values, loads):
     if (name == "JP" or name == "JR") and len(operands) == 1:
         return JumpInstruction(name, operands[0], placeholders.ALWAYS, addr, reads, writes)
 
@@ -506,10 +506,10 @@ def make(name, operands, addr, reads, writes, values, loads):
         if operands[0].value == 0:
             return SwitchInstruction(addr)
 
-        return CallInstruction(name, operands[0], placeholders.ALWAYS, addr)
+        return CallInstruction(database, name, operands[0], placeholders.ALWAYS, addr)
 
     elif name == "CALL" and len(operands) == 2:
-        return CallInstruction(name, operands[0], operands[1], addr)
+        return CallInstruction(database, name, operands[0], operands[1], addr)
 
     elif name in ("RET", "RETI") and not operands:
         return RetInstruction(name, placeholders.ALWAYS, addr)

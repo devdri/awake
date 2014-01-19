@@ -96,7 +96,7 @@ class SingleOpcodeDecoder(object):
     def length(self):
         return 1 + self.argSize
 
-    def decode(self, opcodes, addr):
+    def decode(self, database, opcodes, addr):
         assert len(opcodes) == self.length()
 
         params = self.matchBits(opcodes[0])
@@ -115,5 +115,5 @@ class SingleOpcodeDecoder(object):
 
         reads, writes, values, loads = self.effect.filled(params, make_context(params, argument, next_addr))
 
-        return instruction.make(self.name, out_operands, addr, reads, writes, values, loads), next_addr
+        return instruction.make(database, self.name, out_operands, addr, reads, writes, values, loads), next_addr
 

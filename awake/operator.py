@@ -65,11 +65,11 @@ class BinOp(Operator):
         except AttributeError:
             return False
 
-    def html(self):
-        left = self.left.html()
+    def html(self, database):
+        left = self.left.html(database)
         if self.left.needParen(0):
             left = '(' + left + ')'
-        right = self.right.html()
+        right = self.right.html(database)
         if self.right.needParen(0):
             right = '(' + right + ')'
         return '{0} {1} {2}'.format(left, self.symbol, right)
@@ -375,8 +375,8 @@ class FuncOperator(Operator):
     def __str__(self):
         return '{0}({1})'.format(self.name, ', '.join(str(x) for x in self.childs))
 
-    def html(self):
-        return '{0}({1})'.format(self.name, ', '.join(x.html() for x in self.childs))
+    def html(self, database):
+        return '{0}({1})'.format(self.name, ', '.join(x.html(database) for x in self.childs))
 
     def __hash__(self):
         return hash((self.name, self.args))

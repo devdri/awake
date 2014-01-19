@@ -20,8 +20,7 @@ import ttk
 from tkFileDialog import asksaveasfilename
 from awake import flow, address, procedure, disasm
 from awake.util import AsyncTask, RadioGroup, getTkRoot, BankSelect
-from awake.database import Database, setGlobalDatabase
-from awake.tag import setGlobalTagDB, TagDB
+from awake.database import Database
 
 class ExportTask(AsyncTask):
     scopes = (
@@ -69,9 +68,6 @@ class ExportTask(AsyncTask):
         def strip_tags(text):
             return re.sub(r'<[^><\(\)]*?>', '', text)
         database = Database('data/xxx.db')
-        setGlobalDatabase(database)
-        tags = TagDB('data/tags.db')
-        setGlobalTagDB(tags)
 
         if self.scope == 'all':
             procs = sorted(database.getAll())
@@ -93,19 +89,20 @@ class ExportTask(AsyncTask):
                 self.report(i, num_procs, "Analyzing proc: " + str(addr))
 
                 if self.mode == 'symbols':
-                    if tags.hasNameForAddress(addr):
-                        print >>f, str(addr) + ' ' + tags.nameForAddress(addr)
+                    if database.tagdb.hasNameForAddress(addr):
+                        print >>f, str(addr) + ' ' + database.tagdb.nameForAddress(addr)
                     else:
                         print >>f, str(addr)
                 elif self.mode == 'basic':
-                    print >>f, strip_tags(procedure.loadProcedureRange(addr).html())
+                    print >>f, strip_tags(procedure.loadProcedureRange(addr, database).html(database))
                 elif self.mode == 'flow':
-                    print >>f, strip_tags(flow.ProcedureFlow(addr).html())
+                    print >>f, strip_tags(flow.ProcedureFlow(addr, database).html(database))
                 else:
                     raise AttributeError
 
                 i += 1
 
+        database.close()
         self.report(i, num_procs, "Done!")
 
 class ExportDialog(tk.Toplevel):

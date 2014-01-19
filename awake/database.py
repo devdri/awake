@@ -17,6 +17,7 @@
 import sqlite3
 from . import depend
 from . import address
+from awake.tag import TagDB
 import procedure
 
 class ProcInfo(object):
@@ -94,7 +95,7 @@ class ProcInfo(object):
         c.close()
         connection.commit()
 
-    def html(self):
+    def html(self, database):
         out = ''
         from . import operand
         #out += operand.
@@ -103,6 +104,7 @@ class Database(object):
     def __init__(self, filename):
         self.connection = sqlite3.connect(filename)
         self.init()
+        self.tagdb = TagDB("data/tags.db")
 
     def init(self):
         c = self.connection.cursor()
@@ -197,17 +199,17 @@ class Database(object):
         out += 'ambig calls:\n'
         for result in c.fetchall():
             addr = address.fromConventional(result[0])
-            out += '    ' + operand.ProcAddress(addr).html() + '\n'
+            out += '    ' + operand.ProcAddress(addr).html(self) + '\n'
         c.execute('select addr from procs where suspicious_switch=1')
         out += 'suspicious switch:\n'
         for result in c.fetchall():
             addr = address.fromConventional(result[0])
-            out += '    ' + operand.ProcAddress(addr).html() + '\n'
+            out += '    ' + operand.ProcAddress(addr).html(self) + '\n'
         c.execute('select addr from procs where has_suspicious_instr=1')
         out += 'suspicious instr:\n'
         for result in c.fetchall():
             addr = address.fromConventional(result[0])
-            out += '    ' + operand.ProcAddress(addr).html() + '\n'
+            out += '    ' + operand.ProcAddress(addr).html(self) + '\n'
         c.close()
         out += '</pre>'
         return out
@@ -290,35 +292,26 @@ class Database(object):
         c.execute('select destination from calls where substr(source, 0, 5)<>? and substr(destination, 0, 5)=? group by destination order by destination', (bank_name, bank_name))
         for result in c.fetchall():
             addr = address.fromConventional(result[0])
-            out += '    ' + operand.ProcAddress(addr).html() + '\n'
+            out += '    ' + operand.ProcAddress(addr).html(self) + '\n'
 
         out += 'dependencies:\n'
         c.execute('select destination from calls where substr(source, 0, 5)=? and substr(destination, 0, 5)<>? group by source order by source', (bank_name, bank_name))
         for result in c.fetchall():
             addr = address.fromConventional(result[0])
-            out += '    ' + operand.ProcAddress(addr).html() + '\n'
+            out += '    ' + operand.ProcAddress(addr).html(self) + '\n'
 
         out += 'reads:\n'
         c.execute('select addr from memref where substr(proc, 0, 5)=? and type=? group by addr order by addr', (bank_name, 'read'))
         for result in c.fetchall():
             addr = address.fromConventional(result[0])
-            out += '    ' + operand.DataAddress(addr).html() + '\n'
+            out += '    ' + operand.DataAddress(addr).html(self) + '\n'
 
         out += 'writes:\n'
         c.execute('select addr from memref where substr(proc, 0, 5)=? and type=? group by addr order by addr', (bank_name, 'write'))
         for result in c.fetchall():
             addr = address.fromConventional(result[0])
-            out += '    ' + operand.DataAddress(addr).html() + '\n'
+            out += '    ' + operand.DataAddress(addr).html(self) + '\n'
 
         c.close()
         out += '</pre>'
         return out
-
-_global_db = None
-
-def getGlobalDatabase():
-    return _global_db
-
-def setGlobalDatabase(db):
-    global _global_db
-    _global_db = db

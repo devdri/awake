@@ -112,16 +112,16 @@ cb = opcodedispatcher.OpcodeDispatcher(cb_ops.splitlines())
 rom = rom.Rom("roms/zelda.gb")
 cur_rom = rom
 
-def _decode(addr):
+def _decode(database, addr):
     opcode = rom.get(addr)
     if opcode == 0xCB:
-        return cb.decode(rom, addr.offset(1))
+        return cb.decode(database, rom, addr.offset(1))
     else:
-        return main.decode(rom, addr)
+        return main.decode(database, rom, addr)
 
 cache = dict()
 next_addr_cache = dict()
-def decodeCache(addr):
+def decodeCache(database, addr):
     if addr not in cache:
-        cache[addr], next_addr_cache[addr] = _decode(addr)
+        cache[addr], next_addr_cache[addr] = _decode(database, addr)
     return cache[addr], next_addr_cache[addr]

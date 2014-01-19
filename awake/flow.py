@@ -15,7 +15,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from collections import defaultdict
-from awake.tag import getGlobalTagDB
 from awake import procedure
 from . import regutil
 from . import context
@@ -23,7 +22,6 @@ from . import flowcontrol
 from . import address
 from . import depend
 from . import operand
-from awake.database import getGlobalDatabase
 
 def select_any(x):
     return next(iter(x), None)
@@ -327,10 +325,10 @@ class FlowAnalysis(object):
         return content
 
 class ProcedureFlow(object):
-    def __init__(self, addr):
+    def __init__(self, addr, database):
         self.addr = addr
 
-        graph = procedure.loadProcedureGraph(addr)
+        graph = procedure.loadProcedureGraph(addr, database)
 
         analysis = FlowAnalysis(addr, graph)
         self.content = analysis.analyze()
@@ -390,10 +388,10 @@ class ProcedureFlow(object):
     def tailCalls(self):
         return self._tail_calls
 
-    def html(self):
-        out = '<h1>Procedure flow {0}</h1>\n'.format(getGlobalTagDB().nameForAddress(self.addr));
+    def html(self, database):
+        out = '<h1>Procedure flow {0}</h1>\n'.format(database.tagdb.nameForAddress(self.addr));
         out += '<pre class="disasm">\n';
-        out += self.content.html()
+        out += self.content.html(database)
         out += '</pre>\n'
         return out
 
@@ -401,9 +399,9 @@ class ProcedureFlow(object):
         for x in self.getInstructions():
             x.addToIndex(index)
 
-def update_info(proc):
+def update_info(proc, database):
     print('Updating info for', proc.addr)
-    info = getGlobalDatabase().procInfo(proc.addr)
+    info = database.procInfo(proc.addr)
     info.depset = proc.getDependencySet()
     info.has_switch = proc.has_switch
     info.suspicious_switch = proc.suspicious_switch
@@ -416,16 +414,16 @@ def update_info(proc):
     info.tail_calls = proc.tailCalls()
     info.memreads = proc.memreads
     info.memwrites = proc.memwrites
-    info.save(getGlobalDatabase().connection)
+    info.save(database.connection)
 
 cache = dict()
-def refresh(addr):
-    cache[addr] = ProcedureFlow(addr)
-    update_info(cache[addr])
+def refresh(addr, database):
+    cache[addr] = ProcedureFlow(addr, database)
+    update_info(cache[addr], database)
 
-def at(addr):
+def at(addr, database):
     if addr not in cache:
         cache[addr] = None
-        cache[addr] = ProcedureFlow(addr)
-        update_info(cache[addr])
+        cache[addr] = ProcedureFlow(addr, database)
+        update_info(cache[addr], database)
     return cache[addr]

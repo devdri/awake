@@ -34,7 +34,7 @@ class Operand(object):
         elif self.bits == 1:
             return 1
 
-    def html(self):
+    def html(self, database):
         return str(self)
 
     def optimizedWithContext(self, context):
@@ -59,8 +59,8 @@ class Constant(Operand):
             return str(self.value)
         return hex(self.value)
 
-    def html(self):
-        return html.span(self, 'constant')
+    def html(self, database):
+        return html.span(database, self, 'constant')
 
     def __hash__(self):
         return hash(self.value)
@@ -117,8 +117,8 @@ class AddressConstant(Constant):
             return self.__class__(addr)
         return self
 
-    def html(self):
-        return html.addr_link(self.link_prefix, self.getAddress(), self.html_class)
+    def html(self, database):
+        return html.addr_link(database, self.link_prefix, self.getAddress(), self.html_class)
 
 
 class ProcAddress(AddressConstant):
@@ -144,8 +144,8 @@ class Register(Operand):
     def __str__(self):
         return self.name
 
-    def html(self):
-        return html.span(self, 'register')
+    def html(self, database):
+        return html.span(database, self, 'register')
 
     def optimizedWithContext(self, ctx):
         if ctx.hasValue(self.name):
@@ -203,8 +203,8 @@ class Dereference(Operand):
     def __str__(self):
         return '[{0}]'.format(self.target)
 
-    def html(self):
-        return '[{0}]'.format(self.target.html())
+    def html(self, database):
+        return '[{0}]'.format(self.target.html(database))
 
     def optimizedWithContext(self, ctx):
         target = self.target.optimizedWithContext(ctx)
@@ -242,8 +242,8 @@ class ComputedProcAddress(Operand):
     def __str__(self):
         return '[L {0}:{1}]'.format(self.bank, self.addr)
 
-    def html(self):
-        return '[L {0}:{1}]'.format(self.bank.html(), self.addr.html())
+    def html(self, database):
+        return '[L {0}:{1}]'.format(self.bank.html(database), self.addr.html(database))
 
     def optimizedWithContext(self, ctx):
         bank = self.bank.optimizedWithContext(ctx)

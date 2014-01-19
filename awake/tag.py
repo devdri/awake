@@ -84,14 +84,3 @@ class TagDB(object):
             c.execute('insert into tags (addr, name) values (?, ?)', (str(addr), name))
         c.close()
         self.connection.commit()
-
-_global_db = None
-
-def setGlobalTagDB(db):
-    global _global_db
-    _global_db = db
-
-def getGlobalTagDB():
-    return _global_db
-
-setGlobalTagDB(TagDB('data/tags.db'))

@@ -22,50 +22,50 @@ from . import operand
 from . import jumptable
 from . import procedure
 from . import graph
-from awake.database import Database, getGlobalDatabase, setGlobalDatabase
-from awake.tag import TagDB, getGlobalTagDB, setGlobalTagDB
+from awake.database import Database
+from awake.tag import TagDB
 
-def proc_page(addr, out):
+def proc_page(addr, out, server):
 
-    info = getGlobalDatabase().procInfo(addr)
-    out.write('callers: ' + ', '.join(operand.ProcAddress(x).html() for x in info.callers) + '<br />')
+    info = server.database.procInfo(addr)
+    out.write('callers: ' + ', '.join(operand.ProcAddress(x).html(server.database) for x in info.callers) + '<br />')
 
-    flow.refresh(addr)
+    flow.refresh(addr, server.database)
     #out += 'deps: ' + str(flow.getProcDepSet(addr)) + '<br />'
-    out.write('calls: ' + ', '.join(operand.ProcAddress(x).html() for x in flow.at(addr).calls()) + '<br />')
+    out.write('calls: ' + ', '.join(operand.ProcAddress(x).html(server.database) for x in flow.at(addr, server.database).calls()) + '<br />')
 
 
 
-    out.write(flow.at(addr).html())
+    out.write(flow.at(addr, server.database).html(server.database))
 
-    out.write(procedure.loadProcedureRange(addr).html())
+    out.write(procedure.loadProcedureRange(addr, server.database).html(server.database))
 
-def data_page(addr):
+def data_page(addr, server):
     out = ''
 
-    reads, writes = getGlobalDatabase().getDataReferers(addr)
+    reads, writes = server.database.getDataReferers(addr)
 
     out += '<pre>\n'
     out += 'reads:\n'
     for x in reads:
-        out += operand.ProcAddress(x).html() + '\n'
+        out += operand.ProcAddress(x).html(server.database) + '\n'
     out += 'writes:\n'
     for x in writes:
-        out += operand.ProcAddress(x).html() + '\n'
+        out += operand.ProcAddress(x).html(server.database) + '\n'
     out += '</pre>\n'
     return out
 
-def jumptable_page(addr):
-    return jumptable.JumpTable(addr).html()
+def jumptable_page(addr, server):
+    return jumptable.JumpTable(addr).html(server.database)
 
-def bank_page(bank):
-    return getGlobalDatabase().bankReport(bank)
+def bank_page(bank, server):
+    return server.database.bankReport(bank)
 
-def name_form(addr):
+def name_form(addr, server):
     out = ''
     out += '<form class="name-form" method="get" action="/set-name">'
     out += '<input type="hidden" name="addr" value="{0}" />'.format(addr)
-    out += '<input type="text" name="name" value="{0}" />'.format(getGlobalTagDB().nameForAddress(addr))
+    out += '<input type="text" name="name" value="{0}" />'.format(server.database.tagdb.nameForAddress(addr))
     out += '<input type="submit" value="ok" />'
     out += '</form>'
     return out
@@ -93,15 +93,15 @@ class Handler(BaseHTTPRequestHandler):
             self.ok_html()
             self.wfile.write("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"/style.css\" /></head><body>")
             addr = address.fromConventional(p[2])
-            self.wfile.write(name_form(addr))
-            proc_page(addr, self.wfile)
+            self.wfile.write(name_form(addr, self.server))
+            proc_page(addr, self.wfile, self.server)
             self.wfile.write("</body></html>")
 
         elif self.path.startswith('/home'):
 
             self.ok_html()
             self.wfile.write("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"/style.css\" /></head><body>")
-            self.wfile.write(getGlobalDatabase().getInteresting())
+            self.wfile.write(self.server.database.getInteresting())
             self.wfile.write("</body></html>")
 
         elif self.path.startswith('/data/'):
@@ -111,8 +111,8 @@ class Handler(BaseHTTPRequestHandler):
             self.ok_html()
             self.wfile.write("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"/style.css\" /></head><body>")
             addr = address.fromConventional(p[2])
-            self.wfile.write(name_form(addr))
-            self.wfile.write(data_page(addr))
+            self.wfile.write(name_form(addr, self.server))
+            self.wfile.write(data_page(addr, self.server))
             self.wfile.write("</body></html>")
 
         elif self.path.startswith('/jump/'):
@@ -122,8 +122,8 @@ class Handler(BaseHTTPRequestHandler):
             self.ok_html()
             self.wfile.write("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"/style.css\" /></head><body>")
             addr = address.fromConventional(p[2])
-            self.wfile.write(name_form(addr))
-            self.wfile.write(jumptable_page(addr))
+            self.wfile.write(name_form(addr, self.server))
+            self.wfile.write(jumptable_page(addr, self.server))
             self.wfile.write("</body></html>")
 
         elif self.path.startswith('/bank/'):
@@ -133,7 +133,7 @@ class Handler(BaseHTTPRequestHandler):
             self.ok_html()
             self.wfile.write("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"/style.css\" /></head><body>")
             bank = int(p[2], 16)
-            self.wfile.write(bank_page(bank))
+            self.wfile.write(bank_page(bank, self.server))
             self.wfile.write("</body></html>")
 
         elif self.path == '/style.css':
@@ -156,7 +156,7 @@ class Handler(BaseHTTPRequestHandler):
             print(p, q)
             addr = address.fromConventional(p['addr'][0])
             name = p['name'][0]
-            taggetGlobalTagDB().setNameForAddress(addr, name)
+            self.server.database.tagdb.setNameForAddress(addr, name)
             self.redirect(self.headers['Referer'])
 
         else:
@@ -165,9 +165,6 @@ class Handler(BaseHTTPRequestHandler):
 
 def run():
     database = Database('data/xxx.db')
-    setGlobalDatabase(database)
-    tags = TagDB('data/tags.db')
-    setGlobalTagDB(tags)
 
     import traceback
     try:
@@ -188,5 +185,8 @@ def run():
     #database.produce_map()
 
     server = HTTPServer(('', 8888), Handler)
+    server.database = database
     print("Running server...")
     server.serve_forever()
+
+    database.close()
