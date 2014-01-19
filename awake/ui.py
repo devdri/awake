@@ -17,7 +17,6 @@
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from urlparse import urlparse, parse_qs
 from . import address
-from awake import flow
 from . import operand
 from . import jumptable
 from . import procedure
@@ -35,14 +34,14 @@ def proc_page(addr, out, server):
     renderer.renderList(operand.ProcAddress(x) for x in info.callers)
     renderer.newline()
 
-    flow.refresh(server.proj, addr)
+    server.proj.flow.refresh(addr)
     #out += 'deps: ' + str(flow.getProcDepSet(addr)) + '<br />'
 
     renderer.add('calls: ')
-    renderer.renderList(operand.ProcAddress(x) for x in flow.at(server.proj, addr).calls())
+    renderer.renderList(operand.ProcAddress(x) for x in server.proj.flow.at(addr).calls())
     renderer.newline()
 
-    flow.at(server.proj, addr).render(renderer)
+    server.proj.flow.at(addr).render(renderer)
 
     procedure.loadProcedureRange(server.proj, addr).render(renderer, server.proj)
 

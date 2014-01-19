@@ -17,6 +17,7 @@
 from awake.rom import Rom
 from awake.database import Database
 from awake.disasm import Z80Disasm
+from awake.flow import ProcedureFlowCache
 
 class Project(object):
     def __init__(self, filename):
@@ -24,6 +25,7 @@ class Project(object):
         self.rom = Rom(self.filename)
         self.database = Database('data/xxx.db')
         self.disasm = Z80Disasm(self)
+        self.flow = ProcedureFlowCache(self)
 
     def close(self):
-        pass
+    	self.database.close()

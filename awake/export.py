@@ -18,7 +18,7 @@ import time, re, os, Queue
 import Tkinter as tk
 import ttk
 from tkFileDialog import asksaveasfilename
-from awake import flow, address, procedure
+from awake import address, procedure
 from awake.util import AsyncTask, RadioGroup, getTkRoot, BankSelect
 from awake.textrenderer import HtmlRenderer
 from awake.project import Project
@@ -99,7 +99,7 @@ class ExportTask(AsyncTask):
                 elif self.mode == 'basic':
                     procedure.loadProcedureRange(proj, addr).render(renderer)
                 elif self.mode == 'flow':
-                    flow.ProcedureFlow(proj, addr).render(renderer)
+                    proj.flow.uncached(addr).render(renderer)
                 else:
                     raise AttributeError
 

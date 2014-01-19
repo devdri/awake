@@ -445,10 +445,9 @@ address.fromConventional("0002:5731"),
         #if x.bank() in (0x1E, 0x1F, 0x1B):
         #    continue
 
-        from . import flow
-        flow.refresh(proj, x)
+        proj.flow.refresh(x)
 
-        calls = flow.at(proj, x).calls() | flow.at(proj, x).tailCalls()
+        calls = proj.flow.at(x).calls() | proj.flow.at(x).tailCalls()
         for c in calls:
             callers[c].add(x)
             if c not in procs:

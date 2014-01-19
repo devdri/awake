@@ -417,14 +417,21 @@ def update_info(proc, database):
     info.memwrites = proc.memwrites
     info.save(database.connection)
 
-cache = dict()
-def refresh(proj, addr):
-    cache[addr] = ProcedureFlow(proj, addr)
-    update_info(cache[addr], proj.database)
+class ProcedureFlowCache(object):
+    def __init__(self, proj):
+        self.proj = proj
+        self.cache = dict()
 
-def at(proj, addr):
-    if addr not in cache:
-        cache[addr] = None
-        cache[addr] = ProcedureFlow(proj, addr)
-        update_info(cache[addr], proj.database)
-    return cache[addr]
+    def uncached(self, addr):
+        return ProcedureFlow(self.proj, addr)
+
+    def refresh(self, addr):
+        self.cache[addr] = None
+        self.cache[addr] = ProcedureFlow(self.proj, addr)
+        update_info(self.cache[addr], self.proj.database)
+
+    def at(self, addr):
+        if addr not in self.cache:
+            self.cache[addr] = ProcedureFlow(self.proj, addr)
+            update_info(self.cache[addr], self.proj.database)
+        return self.cache[addr]
