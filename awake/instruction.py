@@ -222,7 +222,7 @@ class JumpInstruction(Instruction):
 
 
 class CallInstruction(Instruction):
-    def __init__(self, database, name, target, cond, addr):
+    def __init__(self, proj, name, target, cond, addr):
         super(CallInstruction, self).__init__(name, addr)
 
         # XXX: IDIOM [CALL HL]
@@ -248,7 +248,7 @@ class CallInstruction(Instruction):
             self.targetAddr = address.fromVirtual(0x4000)  # XXX: ambiguous address
             self.target = target
 
-        self.target_depset = database.procInfo(self.targetAddr).depset
+        self.target_depset = proj.database.procInfo(self.targetAddr).depset
 
         self.returns_used = regutil.ALL_REGS
         self.constant_params = dict()
@@ -336,14 +336,14 @@ class CallInstruction(Instruction):
 
 
 class TailCall(CallInstruction):
-    def __init__(self, database, target):
-        super(TailCall, self).__init__(database, 'tail-call', target, placeholders.ALWAYS, target.getAddress())
+    def __init__(self, proj, target):
+        super(TailCall, self).__init__(proj, 'tail-call', target, placeholders.ALWAYS, target.getAddress())
 
 
 class SwitchInstruction(BaseOp):
-    def __init__(self, addr):
+    def __init__(self, proj, addr):
         super(SwitchInstruction, self).__init__('switch', [placeholders.A, operand.JumpTableAddress(addr.offset(1))], addr)
-        self.jt = jumptable.JumpTable(addr.offset(1))
+        self.jt = jumptable.JumpTable(proj, addr.offset(1))
 
     def optimizedWithContext(self, ctx):
         return self
@@ -493,7 +493,7 @@ class LoadInstruction(ExpressionOp):
             return set()
 
 
-def make(database, name, operands, addr, reads, writes, values, loads):
+def make(proj, name, operands, addr, reads, writes, values, loads):
     if (name == "JP" or name == "JR") and len(operands) == 1:
         return JumpInstruction(name, operands[0], placeholders.ALWAYS, addr, reads, writes)
 
@@ -504,12 +504,12 @@ def make(database, name, operands, addr, reads, writes, values, loads):
 
         # XXX IDIOM
         if operands[0].value == 0:
-            return SwitchInstruction(addr)
+            return SwitchInstruction(proj, addr)
 
-        return CallInstruction(database, name, operands[0], placeholders.ALWAYS, addr)
+        return CallInstruction(proj, name, operands[0], placeholders.ALWAYS, addr)
 
     elif name == "CALL" and len(operands) == 2:
-        return CallInstruction(database, name, operands[0], operands[1], addr)
+        return CallInstruction(proj, name, operands[0], operands[1], addr)
 
     elif name in ("RET", "RETI") and not operands:
         return RetInstruction(name, placeholders.ALWAYS, addr)

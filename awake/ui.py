@@ -22,39 +22,38 @@ from . import operand
 from . import jumptable
 from . import procedure
 from . import graph
-from awake.database import Database
-from awake.tag import TagDB
 from awake.textrenderer import HtmlRenderer
+from awake.project import Project
 
 def proc_page(addr, out, server):
 
-    info = server.database.procInfo(addr)
+    info = server.proj.database.procInfo(addr)
 
-    renderer = HtmlRenderer(server.database)
+    renderer = HtmlRenderer(server.proj.database)
 
     renderer.add('callers: ')
     renderer.renderList(operand.ProcAddress(x) for x in info.callers)
     renderer.newline()
 
-    flow.refresh(addr, server.database)
+    flow.refresh(server.proj, addr)
     #out += 'deps: ' + str(flow.getProcDepSet(addr)) + '<br />'
 
     renderer.add('calls: ')
-    renderer.renderList(operand.ProcAddress(x) for x in flow.at(addr, server.database).calls())
+    renderer.renderList(operand.ProcAddress(x) for x in flow.at(server.proj, addr).calls())
     renderer.newline()
 
-    flow.at(addr, server.database).render(renderer)
+    flow.at(server.proj, addr).render(renderer)
 
-    procedure.loadProcedureRange(addr, server.database).render(renderer, server.database)
+    procedure.loadProcedureRange(server.proj, addr).render(renderer, server.proj)
 
     out.write(renderer.getContents())
 
 def data_page(addr, server):
     out = ''
 
-    reads, writes = server.database.getDataReferers(addr)
+    reads, writes = server.proj.database.getDataReferers(addr)
 
-    renderer = HtmlRenderer(server.database)
+    renderer = HtmlRenderer(server.proj.database)
 
     renderer.addLegacy('<pre>\n')
     renderer.addLegacy('reads:\n')
@@ -70,18 +69,18 @@ def data_page(addr, server):
     return renderer.getContents()
 
 def jumptable_page(addr, server):
-    renderer = HtmlRenderer(server.database)
+    renderer = HtmlRenderer(server.proj.database)
     jumptable.JumpTable(addr).render(renderer)
     return renderer.getContents()
 
 def bank_page(bank, server):
-    return server.database.bankReport(bank)
+    return server.proj.database.bankReport(bank)
 
 def name_form(addr, server):
     out = ''
     out += '<form class="name-form" method="get" action="/set-name">'
     out += '<input type="hidden" name="addr" value="{0}" />'.format(addr)
-    out += '<input type="text" name="name" value="{0}" />'.format(server.database.tagdb.nameForAddress(addr))
+    out += '<input type="text" name="name" value="{0}" />'.format(server.proj.database.tagdb.nameForAddress(addr))
     out += '<input type="submit" value="ok" />'
     out += '</form>'
     return out
@@ -117,7 +116,7 @@ class Handler(BaseHTTPRequestHandler):
 
             self.ok_html()
             self.wfile.write("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"/style.css\" /></head><body>")
-            self.wfile.write(self.server.database.getInteresting())
+            self.wfile.write(self.server.proj.database.getInteresting())
             self.wfile.write("</body></html>")
 
         elif self.path.startswith('/data/'):
@@ -172,7 +171,7 @@ class Handler(BaseHTTPRequestHandler):
             print(p, q)
             addr = address.fromConventional(p['addr'][0])
             name = p['name'][0]
-            self.server.database.tagdb.setNameForAddress(addr, name)
+            self.server.proj.database.tagdb.setNameForAddress(addr, name)
             self.redirect(self.headers['Referer'])
 
         else:
@@ -180,7 +179,7 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
 
 def run():
-    database = Database('data/xxx.db')
+    proj = Project('roms/zelda.gb')
 
     import traceback
     try:
@@ -201,8 +200,8 @@ def run():
     #database.produce_map()
 
     server = HTTPServer(('', 8888), Handler)
-    server.database = database
+    server.proj = proj
     print("Running server...")
     server.serve_forever()
 
-    database.close()
+    proj.close()

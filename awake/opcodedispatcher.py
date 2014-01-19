@@ -31,11 +31,11 @@ class OpcodeDispatcher(object):
                 if decoder.match(byte):
                     self.dispatchTable[byte] = decoder
 
-    def decode(self, database, rom, addr):
-        entry = rom.get(addr)
+    def decode(self, proj, addr):
+        entry = proj.rom.get(addr)
         if entry not in self.dispatchTable:
             print('WARN: bad opcode', addr)
             return instruction.BadOpcode([entry], addr), None
         decoder = self.dispatchTable[entry]
-        opcodes = rom.read(addr, decoder.length())
-        return decoder.decode(database, opcodes, addr)
+        opcodes = proj.rom.read(addr, decoder.length())
+        return decoder.decode(proj, opcodes, addr)

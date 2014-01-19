@@ -1,5 +1,5 @@
 # This file is part of Awake - GB decompiler.
-# Copyright (C) 2012  Wojciech Marczenko (devdri) <wojtek.marczenko@gmail.com>
+# Copyright (C) 2014  Wojciech Marczenko (devdri) <wojtek.marczenko@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,7 +14,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from . import rom
 from . import opcodedispatcher
 
 main_ops = """
@@ -107,21 +106,22 @@ cb_ops = """
 11IIISSS 2 SET  #I, #S                @ read: #S         write: #S:(#S | (1<<#I));
 """
 
-main = opcodedispatcher.OpcodeDispatcher(main_ops.splitlines())
-cb = opcodedispatcher.OpcodeDispatcher(cb_ops.splitlines())
-rom = rom.Rom("roms/zelda.gb")
-cur_rom = rom
+class Z80Disasm(object):
+    def __init__(self, proj):
+        self.proj = proj
+        self.main = opcodedispatcher.OpcodeDispatcher(main_ops.splitlines())
+        self.cb = opcodedispatcher.OpcodeDispatcher(cb_ops.splitlines())
+        self.cache = dict()
+        self.next_addr_cache = dict()
 
-def _decode(database, addr):
-    opcode = rom.get(addr)
-    if opcode == 0xCB:
-        return cb.decode(database, rom, addr.offset(1))
-    else:
-        return main.decode(database, rom, addr)
+    def _decode(self, addr):
+        opcode = self.proj.rom.get(addr)
+        if opcode == 0xCB:
+            return self.cb.decode(self.proj, addr.offset(1))
+        else:
+            return self.main.decode(self.proj, addr)
 
-cache = dict()
-next_addr_cache = dict()
-def decodeCache(database, addr):
-    if addr not in cache:
-        cache[addr], next_addr_cache[addr] = _decode(database, addr)
-    return cache[addr], next_addr_cache[addr]
+    def decodeCache(self, addr):
+        if addr not in self.cache:
+            self.cache[addr], self.next_addr_cache[addr] = self._decode(addr)
+        return self.cache[addr], self.next_addr_cache[addr]

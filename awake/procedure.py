@@ -78,7 +78,7 @@ def manualJumptableLimit(addr):
 
 class ProcedureRangeAnalysis(object):
 
-    def __init__(self, database, addr, limit):
+    def __init__(self, proj, addr, limit):
         self.start_addr = addr
         self.limit_addr = limit
         self.visited = set()
@@ -91,7 +91,7 @@ class ProcedureRangeAnalysis(object):
         self.suspicious_switch = False
         self.warn = False
         self.log = list()
-        self.dfs(database)
+        self.dfs(proj)
         self.shrinkLimitAndCut(self.firstGap())
 
     def isLocalAddr(self, addr):
@@ -151,7 +151,7 @@ class ProcedureRangeAnalysis(object):
         self.labels.add(next_target)
         self.block_starts.add(next_target)
 
-    def visitInstruction(self, database, addr):
+    def visitInstruction(self, proj, addr):
 
         if addr in self.visited or not self.isLocalAddr(addr):
             return
@@ -161,7 +161,7 @@ class ProcedureRangeAnalysis(object):
 
         self.visited.add(addr)
 
-        instr, next_addr = disasm._decode(database, addr)
+        instr, next_addr = proj.disasm._decode(addr)
 
         self.log.append('instr ' + str(addr) + ' ' + str(instr))
 
@@ -192,11 +192,11 @@ class ProcedureRangeAnalysis(object):
             if call_addr != self.start_addr:
                 self.shrinkLimit(call_addr)
 
-    def dfs(self, database):
+    def dfs(self, proj):
         while self.queue or self.jumptable_queue:
             if self.queue:
                 x = self.queue.pop()
-                self.visitInstruction(database, x)
+                self.visitInstruction(proj, x)
             else:
                 x = self.jumptable_queue.pop()
                 self.tryExpandJumptable(x)
@@ -216,7 +216,7 @@ class ProcedureRangeAnalysis(object):
         self.block_starts = set(addr for addr in self.block_starts if self.isLocalAddr(addr))
         self.jumptable_sizes = dict((k, v) for (k, v) in self.jumptable_sizes.items() if self.isLocalAddr(k))
 
-    def render(self, renderer, database):
+    def render(self, renderer, proj):
         renderer.addLegacy('<h1>Procedure ')
         renderer.nameForAddress(self.start_addr)
         renderer.addLegacy('</h1>\n')
@@ -225,16 +225,16 @@ class ProcedureRangeAnalysis(object):
         for addr in sorted(self.visited):
             if addr in self.labels:
                 renderer.label(addr)
-            disasm.decodeCache(database, addr)[0].render(renderer)
+            proj.disasm.decodeCache(addr)[0].render(renderer)
         renderer.addLegacy('</pre>\n')
 
-def getLimit(addr, database):
+def getLimit(proj, addr):
     if addr.inPhysicalMem():
         bank_limit = address.fromVirtualAndBank(0x4000, addr.bank()+1)
     else:
         bank_limit = address.fromVirtual(0xFFFF)
 
-    next_owned = database.getNextOwnedAddress(addr)
+    next_owned = proj.database.getNextOwnedAddress(addr)
 
     if not next_owned or bank_limit < next_owned:
         return bank_limit
@@ -242,7 +242,7 @@ def getLimit(addr, database):
         return next_owned
 
 class ProcedureGraph(object):
-    def __init__(self, database, start_addr, end_addr, block_starts, jumptable_sizes):
+    def __init__(self, proj, start_addr, end_addr, block_starts, jumptable_sizes):
         self.start_addr = start_addr
         self.end_addr = end_addr
         self.jumptable_sizes = jumptable_sizes
@@ -252,11 +252,11 @@ class ProcedureGraph(object):
         self.block_id_at_addr[None] = None
         self._childs = dict()
         self.blocks = [None] * len(block_starts)
-        self.addBlocks(database)
+        self.addBlocks(proj)
         self._parents = defaultdict(list)
         self._fillParents()
 
-    def addBlocks(self, database):
+    def addBlocks(self, proj):
         num_blocks = len(self.blocks)
         for i in range(num_blocks):
             start_addr = self.block_starts[i]
@@ -264,13 +264,13 @@ class ProcedureGraph(object):
                 end_addr = self.block_starts[i+1]
             else:
                 end_addr = self.end_addr
-            self.addBlock(database, i, start_addr, end_addr)
+            self.addBlock(proj, i, start_addr, end_addr)
 
-    def addFakeBlock(self, database, addr):
+    def addFakeBlock(self, proj, addr):
         pos = len(self.blocks)
         self.block_id_at_addr[addr] = pos
 
-        instr = instruction.TailCall(database, operand.ProcAddress(addr))
+        instr = instruction.TailCall(proj, operand.ProcAddress(addr))
 
         from .flowcontrol import Block
         self.blocks.append(Block([instr]))
@@ -278,12 +278,12 @@ class ProcedureGraph(object):
         self.block_starts.append(addr)
         self._childs[pos] = [None]
 
-    def addBlock(self, database, pos, start_addr, end_addr):
+    def addBlock(self, proj, pos, start_addr, end_addr):
 
         instructions = []
         addr = start_addr
         while addr < end_addr:
-            instr, addr = disasm.decodeCache(database, addr)
+            instr, addr = proj.disasm.decodeCache(addr)
             instructions.append(instr)
             if not instr.hasContinue():
                 break
@@ -320,7 +320,7 @@ class ProcedureGraph(object):
         for ch in childs:
             if ch not in self.block_starts:
                 if ch is not None:
-                    self.addFakeBlock(database, ch)
+                    self.addFakeBlock(proj, ch)
 
         self._childs[self.block_id_at_addr[start_addr]] = [self.block_id_at_addr[ch] for ch in childs]
 
@@ -383,12 +383,12 @@ class ProcedureGraph(object):
         renderer.addLegacy('</pre>\n')
 
 
-def loadProcedureRange(addr, database):
-    return ProcedureRangeAnalysis(database, addr, getLimit(addr, database))
+def loadProcedureRange(proj, addr):
+    return ProcedureRangeAnalysis(proj, addr, getLimit(proj, addr))
 
-def loadProcedureGraph(addr, database):
-    r = loadProcedureRange(addr, database)
-    g = ProcedureGraph(database, addr, r.limit_addr, r.block_starts, r.jumptable_sizes)
+def loadProcedureGraph(proj, addr):
+    r = loadProcedureRange(proj, addr)
+    g = ProcedureGraph(proj, addr, r.limit_addr, r.block_starts, r.jumptable_sizes)
     g.suspicious_switch = r.suspicious_switch
     g.warn = r.warn
     return g

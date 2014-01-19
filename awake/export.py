@@ -18,10 +18,10 @@ import time, re, os, Queue
 import Tkinter as tk
 import ttk
 from tkFileDialog import asksaveasfilename
-from awake import flow, address, procedure, disasm
+from awake import flow, address, procedure
 from awake.util import AsyncTask, RadioGroup, getTkRoot, BankSelect
-from awake.database import Database
 from awake.textrenderer import HtmlRenderer
+from awake.project import Project
 
 class ExportTask(AsyncTask):
     scopes = (
@@ -36,8 +36,9 @@ class ExportTask(AsyncTask):
         ("Flow disassembly", 'flow')
     )
 
-    def __init__(self, scope='all', mode='flow', bank=None, address=None, filename=''):
+    def __init__(self, rom_file, scope='all', mode='flow', bank=None, address=None, filename=''):
         super(ExportTask, self).__init__()
+        self.rom_file = rom_filw
         self.scope = scope
         self.mode = mode
         self.bank = bank
@@ -45,10 +46,8 @@ class ExportTask(AsyncTask):
         self.filename = filename
 
     def getDefaultFilename(self):
-        rom_file = disasm.rom.filename
-
-        a = os.path.dirname(rom_file)
-        b = os.path.splitext(os.path.basename(rom_file))[0]
+        a = os.path.dirname(self.rom_file)
+        b = os.path.splitext(os.path.basename(self.rom_file))[0]
         x = os.path.join(a, b)
 
         if self.scope == 'bank':
@@ -68,7 +67,8 @@ class ExportTask(AsyncTask):
     def work(self):
         def strip_tags(text):
             return re.sub(r'<[^><\(\)]*?>', '', text)
-        database = Database('data/xxx.db')
+        proj = Project(self.rom_file)
+        database = proj.database
 
         if self.scope == 'all':
             procs = sorted(database.getAll())
@@ -97,9 +97,9 @@ class ExportTask(AsyncTask):
                     else:
                         renderer.add(str(addr))
                 elif self.mode == 'basic':
-                    procedure.loadProcedureRange(addr, database).render(renderer)
+                    procedure.loadProcedureRange(proj, addr).render(renderer)
                 elif self.mode == 'flow':
-                    flow.ProcedureFlow(addr, database).render(renderer)
+                    flow.ProcedureFlow(proj, addr).render(renderer)
                 else:
                     raise AttributeError
 
@@ -107,7 +107,7 @@ class ExportTask(AsyncTask):
 
                 i += 1
 
-        database.close()
+        proj.close()
         self.report(i, num_procs, "Done!")
 
 class ExportDialog(tk.Toplevel):
@@ -116,7 +116,7 @@ class ExportDialog(tk.Toplevel):
             parent = getTkRoot()
         tk.Toplevel.__init__(self, parent)
 
-        self.task = ExportTask()
+        self.task = ExportTask('roms/zelda.gb')
 
         self.resizable(False, False)
         self.title('Awake Export')

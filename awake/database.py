@@ -242,7 +242,7 @@ class Database(object):
                 writes.add(addr)
         return reads, writes
 
-    def produce_map(self):
+    def produce_map(self, proj):
 
         romsize = 512*1024
         width = 256
@@ -253,14 +253,13 @@ class Database(object):
 
         for i in range(512*1024):
             addr = address.fromPhysical(i)
-            from . import disasm
             if addr.bank() in (0x08, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x1C, 0x1D):
                 color = (0, 0, 255)
             elif addr.bank() == 0x16 and addr.virtual() >= 0x5700:
                 color = (0, 0, 255)
             elif addr.bank() == 0x09 and addr.virtual() >= 0x6700:
                 color = (0, 0, 255)
-            elif disasm.cur_rom.get(addr) == 0xFF:
+            elif proj.rom.get(addr) == 0xFF:
                 color = (0, 0, 127)
             else:
                 color = (0, 0, 0)

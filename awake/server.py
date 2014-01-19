@@ -19,7 +19,7 @@ import Tkinter as tk
 import ttk
 from awake import procedure
 from awake.util import AsyncTask, getTkRoot
-from awake.database import Database
+from awake.project import Project
 from awake import ui
 from BaseHTTPServer import HTTPServer
 import httplib
@@ -51,16 +51,16 @@ class ServerTask(AsyncTask):
         self.server = None
 
     def work(self):
-        self.report("Loading databases")
+        self.report("Loading project")
 
-        database = Database('data/xxx.db')
+        proj = Project('roms/zelda.gb')
 
         self.server = StoppableHTTPServer(('', self.port), StoppableHandler)
-        self.server.database = database
+        self.server.proj = proj
         self.report("Running server...")
         self.server.serve_forever()
 
-        database.close()
+        proj.close()
 
         self.report("Server stopped.")
 

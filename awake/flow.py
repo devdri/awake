@@ -325,10 +325,10 @@ class FlowAnalysis(object):
         return content
 
 class ProcedureFlow(object):
-    def __init__(self, addr, database):
+    def __init__(self, proj, addr):
         self.addr = addr
 
-        graph = procedure.loadProcedureGraph(addr, database)
+        graph = procedure.loadProcedureGraph(proj, addr)
 
         analysis = FlowAnalysis(addr, graph)
         self.content = analysis.analyze()
@@ -418,13 +418,13 @@ def update_info(proc, database):
     info.save(database.connection)
 
 cache = dict()
-def refresh(addr, database):
-    cache[addr] = ProcedureFlow(addr, database)
-    update_info(cache[addr], database)
+def refresh(proj, addr):
+    cache[addr] = ProcedureFlow(proj, addr)
+    update_info(cache[addr], proj.database)
 
-def at(addr, database):
+def at(proj, addr):
     if addr not in cache:
         cache[addr] = None
-        cache[addr] = ProcedureFlow(addr, database)
-        update_info(cache[addr], database)
+        cache[addr] = ProcedureFlow(proj, addr)
+        update_info(cache[addr], proj.database)
     return cache[addr]

@@ -18,18 +18,14 @@ from . import operand
 from . import address
 
 class JumpTable(object):
-    def __init__(self, addr):
+    def __init__(self, proj, addr):
         self.addr = addr
-
         self.targets = []
-
-        from . import disasm
-        rom = disasm.cur_rom
 
         for i in range(256):
             a = addr.offset(i*2)
-            lo = rom.get(a)
-            hi = rom.get(a.offset(1))
+            lo = proj.rom.get(a)
+            hi = proj.rom.get(a.offset(1))
             value = address.fromVirtualAndCurrent((hi<<8) | lo, addr)
 
             if not value.inPhysicalMem():

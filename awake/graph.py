@@ -120,7 +120,7 @@ def save_dot_for_bank(database, bank):
         cur.close()
         f.write("}\n")
 
-def produce_map(ownership):
+def produce_map(proj, ownership):
 
     granularity = 4
     romsize = 512*1024
@@ -135,8 +135,6 @@ def produce_map(ownership):
             addr = address.fromPhysical(j)
             owners |= ownership[addr]
 
-        from . import disasm
-
         color = (0, 0, 0)
         addr = address.fromPhysical(i*granularity)
         if len(owners) == 1:
@@ -149,7 +147,7 @@ def produce_map(ownership):
             color = (0, 0, 255)
         elif addr.bank() == 0x09 and addr.virtual() >= 0x6700:
             color = (0, 0, 255)
-        elif disasm.cur_rom.get(addr) == 0xFF:
+        elif proj.rom.get(addr) == 0xFF:
             color = (0, 0, 127)
 
         x = i % width
@@ -175,7 +173,7 @@ def getSubgraph(database, start_points):
             queue.add(c)
     return verts
 
-def search(database):
+def search(proj):
     """
     input = [
 address.fromConventional("0003:6A4B"),
@@ -429,7 +427,7 @@ address.fromConventional("0002:5731"),
 
     #database.setInitial(input)
 
-    input = database.getAll()
+    input = proj.database.getAll()
     #input = database.getUnfinished()
 
     input = [address.fromConventional("0000:345B")]
@@ -448,13 +446,13 @@ address.fromConventional("0002:5731"),
         #    continue
 
         from . import flow
-        flow.refresh(x)
+        flow.refresh(proj, x)
 
-        calls = flow.at(x, database).calls() | flow.at(x).tailCalls()
+        calls = flow.at(proj, x).calls() | flow.at(proj, x).tailCalls()
         for c in calls:
             callers[c].add(x)
             if c not in procs:
-                database.reportProc(c)
+                proj.database.reportProc(c)
                 procs.add(c)
                 to_update.insert(0, c)
 
@@ -465,5 +463,5 @@ address.fromConventional("0002:5731"),
         #to_update = list(affected - set(to_update)) + to_update
 
     print('saving dot')
-    save_dot(database, procs)
+    save_dot(proj.database, procs)
     print('saved dot')
