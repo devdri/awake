@@ -14,14 +14,31 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+class Indent(object):
+    def __init__(self, renderer):
+        self.renderer = renderer
+
+    def __enter__(self):
+        self.renderer.indent(1)
+
+    def __exit__(self, type, value, traceback):
+        self.renderer.indent(-1)
+
 class HtmlRenderer(object):
     def __init__(self, database):
         self.database = database
         self.content = []
         self.emptyLine = True
+        self.currentIndent = 0
 
     def getContents(self):
         return ''.join(self.content)
+
+    def indent(self, d=None):
+        if d:
+            self.currentIndent += d
+        else:
+            return Indent(self)
 
     def add(self, text, klass=None):
         text = str(text)
@@ -30,8 +47,10 @@ class HtmlRenderer(object):
         self.content.append(text)
         self.emptyLine = False
 
-    def pad(self, indent):
-        self.add('    ' * indent)
+    def pad(self, num=None):
+        if not num:
+            num = self.currentIndent
+        self.add('    ' * num)
 
     def addr_link(self, prefix, addr, klass):
         self.add('<a class="{0}" href="{1}{2}">{3}</a>'.format(klass, prefix, addr, self.database.tagdb.nameForAddress(addr)))
@@ -39,12 +58,12 @@ class HtmlRenderer(object):
     def label(self, addr):
         self.content.append('<a name="{0}">label_{1}</a>:\n'.format(addr, self.database.tagdb.nameForAddress(addr)))
 
-    def newInstruction(self, addr, indent):
+    def newInstruction(self, addr):
         if not self.emptyLine:
             self.newline()
         self.add(str(addr).rjust(9), 'op-addr')
         self.add(' ')
-        self.pad(indent)
+        self.pad()
 
     def instructionName(self, name):
         self.add(name, 'op-name')

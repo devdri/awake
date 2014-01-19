@@ -68,7 +68,7 @@ class Label(instruction.BaseOp):
         ins = regutil.joinRegisters(self.needed - set(['mem']))
         return ' @ ' + ', '.join(sorted(str(x) for x in ins if not isinstance(x, address.Address)))
 
-    def render(self, renderer, indent=0, labels=None):
+    def render(self, renderer, labels=None):
         if not self.gotos:
             return
 
@@ -178,9 +178,9 @@ class Block(instruction.Instruction):
             return True
         return self.contents[-1].hasContinue()
 
-    def render(self, renderer, indent=0):
+    def render(self, renderer):
         for el in self.contents:
-            el.render(renderer, indent)
+            el.render(renderer)
 
     def __str__(self):
         return 'block'+str(len(self.contents))+':'+str(bool(self))+'(' + ','.join(sorted(str(el) for el in self.contents)) + ')'
@@ -235,8 +235,8 @@ class Switch(instruction.Instruction):
     def valueForBranch(self, i):
         return operand.Constant(self.base_value + i)
 
-    def render(self, renderer, indent):
-        renderer.newInstruction(self.addr, indent)
+    def render(self, renderer):
+        renderer.newInstruction(self.addr)
         renderer.instructionName('switch')
         renderer.add(' (')
         self.arg.render(renderer)
@@ -245,14 +245,15 @@ class Switch(instruction.Instruction):
         renderer.add(') {')
 
         for (i, b) in enumerate(self.branches):
-            renderer.newInstruction(self.addr, indent)
+            renderer.newInstruction(self.addr)
             renderer.instructionName('case')
             renderer.add(' ')
             self.valueForBranch(i).render(renderer)
             renderer.add(':')
-            b.render(renderer, indent+1)
+            with renderer.indent():
+                b.render(renderer)
 
-        renderer.newInstruction(self.addr, indent)
+        renderer.newInstruction(self.addr)
         renderer.add('}')
 
     def getInstructions(self, out):
@@ -315,29 +316,32 @@ class If(instruction.Instruction):
             return True
         return self.option_a.hasContinue() or self.option_b.hasContinue()
 
-    def render(self, renderer, indent):
+    def render(self, renderer):
         addr = self.addr
-        renderer.newInstruction(addr, indent)
+        renderer.newInstruction(addr)
         renderer.instructionName('if')
         renderer.add(' (')
         self.cond.render(renderer)
         renderer.add(') {')
 
         if not self.option_a and not self.option_b:
-            renderer.newInstruction(addr, indent)
+            renderer.newInstruction(addr)
             renderer.instructionName('WARN: empty if')
 
         elif not self.option_a:
-            self.option_b.render(renderer, indent+1)
+            with renderer.indent():
+                self.option_b.render(renderer)
         else:
-            self.option_a.render(renderer, indent+1)
+            with renderer.indent():
+                self.option_a.render(renderer)
 
         if self.option_b and self.option_a:
-            renderer.newInstruction(addr, indent)
+            renderer.newInstruction(addr)
             renderer.instructionName('} else {')
-            self.option_b.render(renderer, indent+1)
+            with renderer.indent():
+                self.option_b.render(renderer)
 
-        renderer.newInstruction(addr, indent)
+        renderer.newInstruction(addr)
         renderer.add('}')
 
     def optimizedWithContext(self, ctx):
@@ -421,16 +425,15 @@ class DoWhile(LoopWhile):
         self.continue_label = continue_label
         continue_label.addContinue(self)
 
-    def render(self, renderer, indent):
+    def render(self, renderer):
         addr = "0000:0000"  # TODO: inner first addr
 
-        renderer.newInstruction(addr, indent)
+        renderer.newInstruction(addr)
         renderer.instructionName('do {')
         renderer.instructionSignature(self.signature())
-
-        self.inner.render(renderer, indent+1)
-
-        renderer.newInstruction(addr, indent)
+        with renderer.indent():
+            self.inner.render(renderer)
+        renderer.newInstruction(addr)
         renderer.instructionName('} while (')
         self.postcond.render(renderer)
         renderer.add(')')
@@ -485,16 +488,15 @@ class While(LoopWhile):
         self.continue_label = continue_label
         continue_label.addContinue(self)
 
-    def render(self, renderer, indent):
+    def render(self, renderer):
         addr = "0000:0000"  # TODO: inner first addr
 
-        renderer.newInstruction(addr, indent)
+        renderer.newInstruction(addr)
         renderer.instructionName('while (1) {')
         renderer.instructionSignature(self.signature())
-
-        self.inner.render(renderer, indent+1)
-
-        renderer.newInstruction(addr, indent)
+        with renderer.indent():
+            self.inner.render(renderer)
+        renderer.newInstruction(addr)
         renderer.instructionName('}')
 
     def hasContinue(self):

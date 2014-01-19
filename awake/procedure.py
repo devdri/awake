@@ -225,7 +225,7 @@ class ProcedureRangeAnalysis(object):
         for addr in sorted(self.visited):
             if addr in self.labels:
                 renderer.label(addr)
-            disasm.decodeCache(database, addr)[0].render(renderer, 0)
+            disasm.decodeCache(database, addr)[0].render(renderer)
         renderer.addLegacy('</pre>\n')
 
 def getLimit(addr, database):

@@ -67,8 +67,8 @@ class Instruction(object):
     def splitToSimple(self):
         return [self]
 
-    def render(self, renderer, indent=0):
-        renderer.newInstruction(self.addr, indent)
+    def render(self, renderer):
+        renderer.newInstruction(self.addr)
         renderer.instructionName(self.name)
         renderer.add('    ')
         renderer.renderList(self.operands())
@@ -470,8 +470,8 @@ class LoadInstruction(ExpressionOp):
 
         return LoadInstruction(self.name, target, source, self.addr)
 
-    def render(self, renderer, indent=0):
-        renderer.newInstruction(self.addr, indent)
+    def render(self, renderer):
+        renderer.newInstruction(self.addr)
         self.target.render(renderer)
         renderer.add(' = ')
         self.source.render(renderer)
