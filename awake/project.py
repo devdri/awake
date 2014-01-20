@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import os
 from awake.database import Database
 from awake.disasm import Z80Disasm
 from awake.flow import ProcedureFlowCache
@@ -23,9 +24,12 @@ class Project(object):
     def __init__(self, filename):
         self.filename = filename
         self.rom = Rom(self.filename)
-        self.database = Database('data/xxx.db')
+        self.database = Database(self.filenameBase()+'.awakedb')
         self.disasm = Z80Disasm(self)
         self.flow = ProcedureFlowCache(self)
+
+    def filenameBase(self):
+        return os.path.splitext(self.filename)[0]
 
     def close(self):
     	self.database.close()
