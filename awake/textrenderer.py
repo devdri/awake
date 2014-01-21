@@ -24,15 +24,27 @@ class Indent(object):
     def __exit__(self, type, value, traceback):
         self.renderer.indent(-1)
 
-class HtmlRenderer(object):
+class RendererSettingBlock(object):
+    """Sets a renderer setting on entering a with block and restores it on leaving."""
+
+    def __init__(self, renderer, setting_name, setting_value):
+        self.renderer = renderer
+        self.setting_name = setting_name
+        self.setting_value = setting_value
+
+    def __enter__(self):
+        self.old_value = getattr(self.renderer, self.setting_name)
+        setattr(self.renderer, self.setting_name, self.setting_value)
+
+    def __exit__(self, type, value, traceback):
+        setattr(self.renderer, self.setting_name, self.old_value)
+
+class Renderer(object):
     def __init__(self, database):
         self.database = database
-        self.content = []
-        self.emptyLine = True
         self.currentIndent = 0
-
-    def getContents(self):
-        return ''.join(self.content)
+        self.currentLineAddr = None
+        self.inComment = False
 
     def indent(self, d=None):
         if d:
@@ -40,28 +52,20 @@ class HtmlRenderer(object):
         else:
             return Indent(self)
 
-    def add(self, text, klass=None):
-        text = str(text)
-        if klass:
-            text = '<span class="{1}">{0}</span>'.format(text, klass)
-        self.content.append(text)
-        self.emptyLine = False
+    def lineAddress(self, addr):
+        return RendererSettingBlock(self, 'currentLineAddr', addr)
+
+    def comment(self):
+        return RendererSettingBlock(self, 'inComment', True)
 
     def pad(self, num=None):
         if not num:
             num = self.currentIndent
-        self.add('    ' * num)
-
-    def addr_link(self, prefix, addr, klass):
-        self.add('<a class="{0}" href="{1}{2}">{3}</a>'.format(klass, prefix, addr, self.database.nameForAddress(addr)))
-
-    def label(self, addr):
-        self.content.append('<a name="{0}">label_{1}</a>:\n'.format(addr, self.database.nameForAddress(addr)))
+        self.add('  ' * num)
 
     def newInstruction(self, addr):
-        if not self.emptyLine:
-            self.newline()
-        self.add(str(addr).rjust(9), 'op-addr')
+        self.add('\n')
+        self.add(str(addr).rjust(9), 'line-address')
         self.add(' ')
         self.pad()
 
@@ -69,14 +73,19 @@ class HtmlRenderer(object):
         self.add(name, 'op-name')
 
     def instructionSignature(self, signature):
+        # TODO: make it proper
+        if not isinstance(signature, str):
+            signature = str(signature)
+
         self.add(signature, 'op-signature')
 
-    def newline(self): # warn: not used everywhere
+    def label(self, addr, signature=None):
         self.add('\n')
-        self.emptyLine = True
-
-    def addLegacy(self, text):
-        self.add(text)
+        self.add(str(addr), 'line-address')
+        self.add(' ')
+        self.write('label_'+str(addr)+':', 'label')
+        if signature:
+            self.instructionSignature(signature)
 
     def renderList(self, elements, sep=', '):
         prev = False
@@ -91,3 +100,71 @@ class HtmlRenderer(object):
 
     def nameForAddress(self, addr):
         self.add(self.database.nameForAddress(addr))
+
+    def add(self, text, klass=None, url=None):
+        assert isinstance(text, str)
+        if self.inComment and not klass:
+            klass = 'comment'
+        self._add(text, klass, url)
+
+    def write(self, text, klass=None, url=None):
+        self.add(text, klass, url)
+
+    def startNewLine(self):
+        self.add('\n')
+        self.add(str(self.currentLineAddr), 'line-address')
+        self.add(' ')
+        self.pad()
+        if self.inComment:
+            self.add('# ', 'comment')
+
+    def writeList(self, elements, sep=', '):
+        return self.renderList(elements, sep)
+
+    def writeSymbol(self, addr, klass, url=None):
+        return self.add(self.database.nameForAddress(addr), klass, url)
+
+    def hline(self):
+        with self.comment():
+            self.startNewLine()
+            self.write('-'*40)
+
+class HtmlRenderer(Renderer):
+    def __init__(self, database):
+        super(HtmlRenderer, self).__init__(database)
+        self.content = []
+
+    def getContents(self):
+        return '<pre>' + (''.join(self.content)) + '</pre>'
+
+    def _add(self, text, klass=None, url=None):
+        text = str(text)
+        if klass:
+            text = '<span class="{1}">{0}</span>'.format(text, klass)
+        if url:
+            text = '<a href="{1}">{0}</a>'.format(text, url)
+        self.content.append(text)
+
+class PlainTextRenderer(Renderer):
+    def __init__(self, database):
+        super(PlainTextRenderer, self).__init__(database)
+        self.content = []
+
+    def getContents(self):
+        print self.content
+        print [str(x) for x in self.content]
+        return ''.join(self.content)
+
+    def _add(self, text, klass=None, url=None):
+        self.content.append(text)
+
+class TkRenderer(Renderer):
+    def __init__(self, database, tk_text):
+        super(TkRenderer, self).__init__(database)
+        self.tk_text = tk_text
+
+    def _add(self, text, klass=None, url=None):
+        if url:
+            self.tk_text.insertLink(text, url, (klass,))
+        else:
+            self.tk_text.insert('end', text, (klass,))

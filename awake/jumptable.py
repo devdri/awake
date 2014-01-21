@@ -34,12 +34,18 @@ class JumpTable(object):
             self.targets.append(ProcAddress(value))
 
     def render(self, renderer):
-        renderer.addLegacy('<h1>Jump table at ' + str(self.addr) + '</h1>')
-        renderer.addLegacy('<pre>')
-        i = 0
-        for t in self.targets:
-            renderer.add(str(i) + ' -> ')
-            t.render(renderer)
-            renderer.newline()
-            i += 1
-        renderer.addLegacy('</pre>')
+        with renderer.lineAddress(self.addr):
+            with renderer.comment():
+                renderer.hline()
+                renderer.startNewLine()
+                renderer.write('jumptable ')
+                renderer.writeSymbol(self.addr, 'jumptable')
+                renderer.hline()
+        with renderer.indent():
+            i = 0
+            for t in self.targets:
+                with renderer.lineAddress(self.addr.offset(i*2)):
+                    renderer.startNewLine()
+                    renderer.write(str(i) + ' -> ')
+                    t.render(renderer)
+                i += 1

@@ -59,7 +59,7 @@ class Constant(Operand):
         return hex(self.value)
 
     def render(self, renderer):
-        renderer.add(self, 'constant')
+        renderer.add(str(self), 'constant')
 
     def __hash__(self):
         return hash(self.value)
@@ -117,8 +117,8 @@ class AddressConstant(Constant):
         return self
 
     def render(self, renderer):
-        renderer.addr_link(self.link_prefix, self.getAddress(), self.html_class)
-
+        addr = self.getAddress()
+        renderer.writeSymbol(addr, self.html_class, self.link_prefix + str(addr))
 
 class ProcAddress(AddressConstant):
     link_prefix = "/proc/"
@@ -144,7 +144,7 @@ class Register(Operand):
         return self.name
 
     def render(self, renderer):
-        renderer.add(self, 'register')
+        renderer.add(str(self), 'register')
 
     def optimizedWithContext(self, ctx):
         if ctx.hasValue(self.name):

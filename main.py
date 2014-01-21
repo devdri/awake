@@ -1,5 +1,5 @@
 # This file is part of Awake - GB decompiler.
-# Copyright (C) 2012  Wojciech Marczenko (devdri) <wojtek.marczenko@gmail.com>
+# Copyright (C) 2014  Wojciech Marczenko (devdri) <wojtek.marczenko@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,8 +14,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import awake.ui
+from __future__ import print_function
+from awake.server import ServerTask
 
 if __name__ == '__main__':
-    awake.ui.run()
-
+    task = ServerTask()
+    task.report = print
+    task.executeSynchronous()

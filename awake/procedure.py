@@ -215,15 +215,10 @@ class ProcedureRangeAnalysis(object):
         self.jumptable_sizes = dict((k, v) for (k, v) in self.jumptable_sizes.items() if self.isLocalAddr(k))
 
     def render(self, renderer, proj):
-        renderer.addLegacy('<h1>Procedure ')
-        renderer.nameForAddress(self.start_addr)
-        renderer.addLegacy('</h1>\n')
-        renderer.addLegacy('<pre class="disasm">')
         for addr in sorted(self.visited):
             if addr in self.labels:
                 renderer.label(addr)
             proj.disasm.decodeCache(addr)[0].render(renderer)
-        renderer.addLegacy('</pre>\n')
 
 def getLimit(proj, addr):
     if addr.inPhysicalMem():
@@ -364,21 +359,29 @@ class ProcedureGraph(object):
         return self.end_addr.virtual() - self.start_addr.virtual()
 
     def render(self, renderer):
-        renderer.addLegacy('Proc graph ')
-        renderer.nameForAddress(self.start_addr)
-        renderer.addLegacy('<pre class="disasm">')
-        for i, b in enumerate(self.blocks):
-            renderer.add('BLOCK' + str(i))
-            renderer.newline()
-            b.render(renderer)
-        renderer.add('edges:')
-        renderer.newline()
-        for x in self.vertices():
-            renderer.add(str(x) + ' -> ')
-            renderer.renderList(self.childs(x))
-            renderer.newline()
-        renderer.addLegacy('</pre>\n')
+        with renderer.lineAddr(self.start_addr):
+            with renderer.comment():
+                renderer.hline()
+                renderer.startNewLine()
+                renderer.write('Proc graph ')
+                renderer.writeSymbol(self.start_addr)
+                renderer.hline()
 
+        for i, b in enumerate(self.blocks):
+            with renderer.comment():
+                renderer.startNewLine()
+                renderer.write('BLOCK' + str(i))
+            with renderer.indent():
+                b.render(renderer)
+
+        with renderer.comment():
+            renderer.startNewLine()
+            renderer.write('edges:')
+
+            for x in self.vertices():
+                renderer.startNewLine()
+                renderer.write(str(x) + ' -> ')
+                renderer.renderList(self.childs(x))
 
 def loadProcedureRange(proj, addr):
     return ProcedureRangeAnalysis(proj, addr, getLimit(proj, addr))

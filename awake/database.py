@@ -142,7 +142,7 @@ class Database(object):
         c = self.connection.cursor()
         c.execute('create table if not exists procs(addr address, type text, depset text, has_switch integer, suspicious_switch integer, has_suspicious_instr integer, has_nop integer, has_ambig_calls integer, length integer)')
         c.execute('create table if not exists calls(source address, destination address, type text)')
-        c.execute('create table if not exists memref(addr address, proc text, type text)')
+        c.execute('create table if not exists memref(addr address, proc address, type text)')
         c.execute('create table if not exists tags(addr address, name text)')
         c.close()
         self.connection.commit()
@@ -211,31 +211,6 @@ class Database(object):
         c.close()
         self.connection.commit()
 
-    def getInteresting(self):
-        renderer = HtmlRenderer(self)
-
-        c = self.connection.cursor()
-        c.execute('select addr from procs where has_ambig_calls=1')
-        renderer.add('ambig calls:\n')
-        for addr, in c.fetchall():
-            renderer.pad(1)
-            ProcAddress(addr).render(renderer)
-            renderer.newline()
-        c.execute('select addr from procs where suspicious_switch=1')
-        renderer.add('suspicious switch:\n')
-        for addr, in c.fetchall():
-            renderer.pad(1)
-            ProcAddress(addr).render(renderer)
-            renderer.newline()
-        c.execute('select addr from procs where has_suspicious_instr=1')
-        renderer.add('suspicious instr:\n')
-        for addr, in c.fetchall():
-            renderer.pad(1)
-            ProcAddress(addr).render(renderer) + '\n'
-            renderer.newline()
-        c.close()
-        return '<pre>' + renderer.getContents() + '</pre>'
-
     def getAmbigCalls(self):
         with closing(self.connection.cursor()) as c:
             c.execute('select addr from procs where has_ambig_calls=1')
@@ -294,41 +269,3 @@ class Database(object):
 
         img.save('data/ownership.png')
         print('image saved')
-
-    def bankReport(self, bank):
-        bank_name = "{:04X}".format(bank)
-
-        renderer = HtmlRenderer(self)
-
-        c = self.connection.cursor()
-
-        renderer.add('public interface:\n')
-        c.execute('select destination from calls where substr(source, 0, 5)<>? and substr(destination, 0, 5)=? group by destination order by destination', (bank_name, bank_name))
-        for addr, in c.fetchall():
-            renderer.pad(1)
-            ProcAddress(addr).render(renderer) + '\n'
-            renderer.newline()
-
-        renderer.add('dependencies:\n')
-        c.execute('select destination from calls where substr(source, 0, 5)=? and substr(destination, 0, 5)<>? group by source order by source', (bank_name, bank_name))
-        for addr, in c.fetchall():
-            renderer.pad(1)
-            ProcAddress(addr).render(renderer) + '\n'
-            renderer.newline()
-
-        renderer.add('reads:\n')
-        c.execute('select addr from memref where substr(proc, 0, 5)=? and type=? group by addr order by addr', (bank_name, 'read'))
-        for addr, in c.fetchall():
-            renderer.pad(1)
-            DataAddress(addr).render(renderer) + '\n'
-            renderer.newline()
-
-        renderer.add('writes:\n')
-        c.execute('select addr from memref where substr(proc, 0, 5)=? and type=? group by addr order by addr', (bank_name, 'write'))
-        for addr, in c.fetchall():
-            renderer.pad(1)
-            DataAddress(addr).render(renderer) + '\n'
-            renderer.newline()
-
-        c.close()
-        return '<pre>' + renderer.getContents() + '</pre>'

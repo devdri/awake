@@ -19,19 +19,89 @@ import Tkinter as tk
 import ttk
 import httplib
 import webbrowser
-from BaseHTTPServer import HTTPServer
-from awake import procedure, ui
+from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+from urlparse import urlparse, parse_qs
+from awake import address, procedure
+from awake.textrenderer import HtmlRenderer
 from awake.util import AsyncTask, getTkRoot
+from awake.pages import dispatchUrl
 from awake.project import Project
 
-class StoppableHandler(ui.Handler):
+def name_form(addr, database):
+    out = ''
+    out += '<form class="name-form" method="get" action="/set-name">'
+    out += '<input type="hidden" name="addr" value="{0}" />'.format(addr)
+    out += '<input type="text" name="name" value="{0}" />'.format(database.nameForAddress(addr))
+    out += '<input type="submit" value="ok" />'
+    out += '</form>'
+    return out
+
+class Handler(BaseHTTPRequestHandler):
+
+    def redirect(self, where):
+        self.send_response(301)
+        self.send_header('Location', where)
+        self.end_headers()
+
+    def ok_html(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html;charset=utf-8')
+        self.end_headers()
+
     def do_GET(self):
-        if self.path == '/quit/':
+
+        print('get', self.path)
+
+
+        page = dispatchUrl(self.server.proj, self.path)
+        if page:
+
+            self.ok_html()
+            self.wfile.write("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"/style.css\" /></head><body>")
+
+            if page.has_name_form:
+                self.wfile.write(name_form(page.addr, self.server.proj.database))
+
+            renderer = HtmlRenderer(self.server.proj.database)
+
+            page.load()
+            page.render(renderer)
+
+            self.wfile.write(renderer.getContents())
+
+            self.wfile.write("</body></html>")
+
+        elif self.path == '/style.css':
+            self.send_response(200)
+            self.send_header('Content-type', 'text/css')
+            self.end_headers()
+            with open('style.css', 'r') as f:
+                self.wfile.write(f.read())
+
+        elif self.path == '/favicon.ico':
+            self.send_response(200)
+            self.send_header('Content-type', 'image/x-icon')
+            self.end_headers()
+            with open('favicon.ico', 'r') as f:
+                self.wfile.write(f.read())
+
+        elif self.path.startswith('/set-name?'):
+            q = urlparse(self.path).query
+            p = parse_qs(q)
+            print(p, q)
+            addr = address.fromConventional(p['addr'][0])
+            name = p['name'][0]
+            self.server.proj.database.setNameForAddress(addr, name)
+            self.redirect(self.headers['Referer'])
+
+        elif self.path == '/quit/':
             self.server.request_stop = True
             self.send_response(200)
             self.end_headers()
+
         else:
-            return ui.Handler.do_GET(self)
+            self.send_response(404)
+            self.end_headers()
 
     def address_string(self):
         # fix for slow reverse lookup on Windows
@@ -54,7 +124,7 @@ class ServerTask(AsyncTask):
 
         proj = Project('roms/zelda.gb')
 
-        self.server = StoppableHTTPServer(('', self.port), StoppableHandler)
+        self.server = StoppableHTTPServer(('', self.port), Handler)
         self.server.proj = proj
         self.report("Running server...")
         self.server.serve_forever()

@@ -387,12 +387,7 @@ class ProcedureFlow(object):
         return self._tail_calls
 
     def render(self, renderer):
-        renderer.addLegacy('<h1>Procedure flow ')
-        renderer.nameForAddress(self.addr)
-        renderer.addLegacy('</h1>\n')
-        renderer.addLegacy('<pre class="disasm">\n')
         self.content.render(renderer)
-        renderer.addLegacy('</pre>\n')
 
     def addToIndex(self, index):
         for x in self.getInstructions():

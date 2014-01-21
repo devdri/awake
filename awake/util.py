@@ -33,6 +33,11 @@ class AsyncTask(object):
     def isFinished(self):
         return self.thread is not None and not self.thread.is_alive()
 
+    def executeSynchronous(self):
+        self.requestCancel = False
+        self.error = None
+        self.work()
+
     def report(self, *args):
         self.queue.put(args)
 

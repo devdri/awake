@@ -70,10 +70,7 @@ class Label(BaseOp):
     def render(self, renderer, labels=None):
         if not self.gotos:
             return
-
-        if not renderer.emptyLine:
-            renderer.newline()
-        renderer.addLegacy('<a name="{0}">label_{1}</a>: {2}'.format(self.addr, self.addr, self.signature()))
+        renderer.label(self.addr, self.signature())
 
 class FlowTerminator(BaseOp):
     def __init__(self, name, target=None):
