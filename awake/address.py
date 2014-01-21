@@ -74,7 +74,8 @@ class Address(object):
 
 
     def __init__(self, address):
-        self.address = int(address)
+        assert isinstance(address, int)
+        self.address = address
 
 
     def virtual(self):
