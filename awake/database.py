@@ -76,11 +76,11 @@ class ProcInfo(object):
         self.memreads = set()
         self.memwrites = set()
         c.execute('select addr, type from memref where proc=?', (addr,))
-        for addr, reftype in c.fetchall():
+        for address, reftype in c.fetchall():
             if reftype == 'read':
-                self.memreads.add(addr)
+                self.memreads.add(address)
             else:
-                self.memwrites.add(addr)
+                self.memwrites.add(address)
 
         self.callers = set()
         c.execute('select source from calls where destination=?', (addr,))
