@@ -15,11 +15,27 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import print_function
-from awake.server import ServerTask
+import argparse
 from awake.gui import MainWindow
+from awake.project import Project
+from awake.server import ServerTask
+
+parser = argparse.ArgumentParser()
+parser.add_argument('rom_file', nargs='?')
+parser.add_argument('start_url', nargs='?')
+parser.add_argument('--server', action='store_true', default=False)
 
 if __name__ == '__main__':
-    #task = ServerTask()
-    #task.report = print
-    #task.executeSynchronous()
-    MainWindow(None).mainloop()
+    args = parser.parse_args()
+
+    if args.server:
+        if args.rom_file:
+            proj = Project(args.rom_file)
+            task = ServerTask(proj)
+            task.report = print
+            task.executeSynchronous()
+        else:
+            print("Rom file is required for running server\n")
+    else:
+        app = MainWindow(None, args.rom_file, args.start_url)
+        app.mainloop()

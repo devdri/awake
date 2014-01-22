@@ -127,7 +127,8 @@ class ServerTask(AsyncTask):
 
         self.server = StoppableHTTPServer(('', self.port), Handler)
         self.server.proj = proj
-        self.report("Running server...")
+        self.report("Running server on port {0}...".format(self.port))
+        self.report("Please open url http://127.0.0.1:{0}/proc/100".format(self.port))
         self.server.serve_forever()
 
         proj.close()
