@@ -184,6 +184,12 @@ class Xor(BinOp):
     def calculate(left, right):
         return left ^ right
 
+    @classmethod
+    def make(cls, left, right):
+        if left == right:
+            return Constant(0)
+        return super(Xor, cls).make(left, right)
+
 class Equals(BinOp):
     symbol = '=='
     bits = 1
