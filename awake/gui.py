@@ -140,7 +140,7 @@ class MainFrame(ttk.Frame):
     def __init__(self, parent, proj=None):
         ttk.Frame.__init__(self, parent)
         self.proj = proj
-        self.text = SmartText(self, width=40, height=32)
+        self.text = SmartText(self, width=80, height=32)
         self.vsb = ttk.Scrollbar(self, orient="vertical", command=self.text.yview)
         self.text.configure(yscrollcommand=self.vsb.set)
         self.vsb.pack(side="right", fill="y")
@@ -246,7 +246,7 @@ class History(ttk.Frame):
 
 class SmartText(tk.Text):
     def __init__(self, parent, **kwargs):
-        tk.Text.__init__(self, parent, bd=0, wrap='char', font=("Menlo", 12, 'normal'), highlightthickness=0)
+        tk.Text.__init__(self, parent, bd=0, wrap='char', font=("courier", 12, 'normal'), highlightthickness=0)
         self.configure(**kwargs)
 
         self.tag_config("link", foreground='blue', underline=True)
