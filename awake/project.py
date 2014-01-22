@@ -33,3 +33,7 @@ class Project(object):
 
     def close(self):
     	self.database.close()
+
+    def openCopy(self):
+        """Create a project mirror for safe use from different thread"""
+        return Project(self.filename)

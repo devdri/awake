@@ -36,9 +36,9 @@ class ExportTask(AsyncTask):
         ("Flow disassembly", 'flow')
     )
 
-    def __init__(self, rom_file, scope='all', mode='flow', bank=None, address=None, filename=''):
+    def __init__(self, proj, scope='all', mode='flow', bank=None, address=None, filename=''):
         super(ExportTask, self).__init__()
-        self.rom_file = rom_file
+        self.base_proj = proj
         self.scope = scope
         self.mode = mode
         self.bank = bank
@@ -46,8 +46,8 @@ class ExportTask(AsyncTask):
         self.filename = filename
 
     def getDefaultFilename(self):
-        a = os.path.dirname(self.rom_file)
-        b = os.path.splitext(os.path.basename(self.rom_file))[0]
+        a = os.path.dirname(self.base_proj.filename)
+        b = os.path.splitext(os.path.basename(self.base_proj.filename))[0]
         x = os.path.join(a, b)
 
         if self.scope == 'bank':
@@ -67,7 +67,7 @@ class ExportTask(AsyncTask):
     def work(self):
         def strip_tags(text):
             return re.sub(r'<[^><\(\)]*?>', '', text)
-        proj = Project(self.rom_file)
+        proj = self.base_proj.openCopy()
         database = proj.database
 
         if self.scope == 'all':
@@ -111,13 +111,13 @@ class ExportTask(AsyncTask):
         self.report(i, num_procs, "Done!")
 
 class ExportDialog(tk.Toplevel):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, proj=None):
         if not parent:
             parent = getTkRoot()
         tk.Toplevel.__init__(self, parent)
 
-        self.proj = Project('roms/zelda.gb')
-        self.task = ExportTask(self.proj.filename)
+        assert proj
+        self.task = ExportTask(proj)
 
         self.resizable(False, False)
         self.title('Awake Export')
@@ -135,7 +135,7 @@ class ExportDialog(tk.Toplevel):
         radio.grid(row=1, column=1, columnspan=2, sticky='NESW')
         radio = ttk.Radiobutton(group, text='Single bank', variable=self.scope_var, value='bank')
         radio.grid(row=2, column=1, sticky='NESW')
-        self.bank_select = BankSelect(group, self.proj)
+        self.bank_select = BankSelect(group, proj)
         self.bank_select.var.trace('w', self.enableBank)
         self.bank_select.grid(row=2, column=2, sticky='NESW')
         radio = ttk.Radiobutton(group, text='Single procedure', variable=self.scope_var, value='proc')
@@ -155,10 +155,12 @@ class ExportDialog(tk.Toplevel):
         self.export_button = ttk.Button(frame)
         self.export_button.grid(row=5, column=2, columnspan=1, sticky='NESW')
         self.enableExport()
-        self.close_button = ttk.Button(frame, text="Close", command=self.close)
+        self.close_button = ttk.Button(frame, text="Close", command=self.quit)
         self.close_button.grid(row=5, column=1, sticky='NESW')
         self.bind('<Return>', self.export)
-        self.bind('<Escape>', self.close)
+        self.bind('<Escape>', self.quit)
+
+        self.protocol("WM_DELETE_WINDOW", self.quit)
 
     def update(self):
         try:
@@ -206,7 +208,7 @@ class ExportDialog(tk.Toplevel):
         self.task.requestCancel = True
         self.enableExport()
 
-    def close(self, *args):
+    def quit(self, *args):
         self.task.requestCancel = True
         self.destroy()
 

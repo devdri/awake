@@ -114,15 +114,16 @@ class StoppableHTTPServer(HTTPServer):
             self.handle_request()
 
 class ServerTask(AsyncTask):
-    def __init__(self, port=8888):
+    def __init__(self, proj, port=8888):
         super(ServerTask, self).__init__()
+        self.base_proj = proj
         self.port = port
         self.server = None
 
     def work(self):
         self.report("Loading project")
 
-        proj = Project('roms/zelda.gb')
+        proj = self.base_proj.openCopy()
 
         self.server = StoppableHTTPServer(('', self.port), Handler)
         self.server.proj = proj
@@ -134,10 +135,11 @@ class ServerTask(AsyncTask):
         self.report("Server stopped.")
 
     def stop(self):
-        connection = httplib.HTTPConnection("127.0.0.1", self.port)
-        connection.request('GET', '/quit/')
-        connection.getresponse()
-        self.server = None
+        if self.server:
+            connection = httplib.HTTPConnection("127.0.0.1", self.port)
+            connection.request('GET', '/quit/')
+            connection.getresponse()
+            self.server = None
 
 class LogFrame(ttk.Frame):
     def __init__(self, parent):
@@ -157,10 +159,10 @@ class LogFrame(ttk.Frame):
         self.text.yview_moveto(1)
 
 class ServerFrame(ttk.Frame):
-    def __init__(self, parent, log):
+    def __init__(self, parent, log, proj):
         ttk.Frame.__init__(self, parent)
 
-        self.task = ServerTask()
+        self.task = ServerTask(proj)
         self.log = log
 
         self.port_var = tk.StringVar()
@@ -209,7 +211,7 @@ class ServerFrame(ttk.Frame):
         webbrowser.open_new_tab("http://127.0.0.1:"+self.port_var.get()+"/proc/0100")
 
 class ServerDialog(tk.Toplevel):
-    def __init__(self, parent=None):
+    def __init__(self, parent, proj):
         if not parent:
             parent = getTkRoot()
         tk.Toplevel.__init__(self, parent)
@@ -220,10 +222,16 @@ class ServerDialog(tk.Toplevel):
         frame.pack(fill='x')
 
         self.log = LogFrame(self)
-        self.server_frame = ServerFrame(frame, self.log)
+        self.server_frame = ServerFrame(frame, self.log, proj)
         self.server_frame.pack(side='left', fill='y', padx=10, pady=10)
 
         self.log.pack(side='bottom', fill='both', expand=True)
+
+        self.protocol("WM_DELETE_WINDOW", self.quit)
+
+    def quit(self):
+        self.server_frame.stopServer()
+        self.destroy()
 
     def wait(self):
         self.wait_window(self)

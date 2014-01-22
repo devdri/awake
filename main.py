@@ -16,8 +16,10 @@
 
 from __future__ import print_function
 from awake.server import ServerTask
+from awake.gui import MainWindow
 
 if __name__ == '__main__':
-    task = ServerTask()
-    task.report = print
-    task.executeSynchronous()
+    #task = ServerTask()
+    #task.report = print
+    #task.executeSynchronous()
+    MainWindow(None).mainloop()
