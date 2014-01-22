@@ -98,7 +98,10 @@ class ComplexValue(Operand):
 class AddressConstant(Constant):
     def __init__(self, addr):
         if not hasattr(addr, 'virtual'):
-            addr = address.fromVirtual(addr)
+            if isinstance(addr, int):                       #If addr is an int,
+                addr = address.fromVirtual(addr)            #   code path is unchanged.
+            else:                                           #Else, addr is a string,
+                addr = address.fromConventional(addr)       #   so it should be processed by fromConventional.
         super(AddressConstant, self).__init__(addr.virtual())
         self.addr = addr
         self.value = addr.virtual()
