@@ -182,7 +182,7 @@ class Database(object):
         return ProcInfo(self.connection, addr)
 
     def reportProc(self, addr):
-        procInfo(self.connection, addr).save(self.connection)
+        ProcInfo(self.connection, addr).save(self.connection)
 
     def getNextOwnedAddress(self, addr):
         with closing(self.connection.cursor()) as c:

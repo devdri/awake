@@ -103,7 +103,7 @@ class Add(BinOp):
             return left
         if left == right:
             return Shl.make(left, Constant(1))
-        if isinstance(left, Sub) and isConstant(left.right):
+        if isConstant(right) and isinstance(left, Sub) and isConstant(left.right):
             return Add.make(left.left, Constant(Sub.calculate(right.value, left.right.value)))
         return super(Add, cls).make(left, right)
 
@@ -122,7 +122,7 @@ class Sub(BinOp):
             return left
         if left == right:
             return Constant(0)
-        if isinstance(left, Sub) and isConstant(left.right):
+        if isConstant(right) and isinstance(left, Sub) and isConstant(left.right):
             return Sub.make(left.left, Constant(Add.calculate(right.value, left.right.value)))
         return super(Sub, cls).make(left, right)
 
