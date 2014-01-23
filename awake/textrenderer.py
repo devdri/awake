@@ -164,7 +164,8 @@ class TkRenderer(Renderer):
         self.tk_text = tk_text
 
     def _add(self, text, klass=None, url=None):
-        if url:
+        # fragment identifiers are not currently supported
+        if url and not url.startswith('#'):
             self.tk_text.insertLink(text, url, (klass,))
         else:
             self.tk_text.insert('end', text, (klass,))

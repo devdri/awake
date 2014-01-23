@@ -24,7 +24,7 @@ from awake.regutil import ALL_REGS, joinRegisters
 class Label(BaseOp):
     def __init__(self, addr):
         super(Label, self).__init__('label', [AddressConstant(addr)])
-        self.addr = address.fromVirtual(0)
+        self.addr = addr
         self.gotos = set()
         self.breaks = set()
         self.continues = set()
@@ -64,7 +64,7 @@ class Label(BaseOp):
             return None
 
     def signature(self):
-        ins = joinRegisters(self.needed - set(['mem']))
+        ins = joinRegisters(self.needed & ALL_REGS)
         return ' @ ' + ', '.join(sorted(str(x) for x in ins if not isinstance(x, address.Address)))
 
     def render(self, renderer, labels=None):
@@ -100,7 +100,7 @@ class Goto(FlowTerminator):
         return DependencySet(self.target_label.depset.reads, set())
 
     def signature(self):
-        ins = joinRegisters(self.target_label.needed - set(['mem']))
+        ins = joinRegisters(self.target_label.needed & ALL_REGS)
         return ' @ ' + ', '.join(sorted(str(x) for x in ins if not isinstance(x, address.Address)))
 
 class Break(FlowTerminator):
@@ -116,7 +116,7 @@ class Break(FlowTerminator):
         return DependencySet(self.target_label.depset.reads, set())
 
     def signature(self):
-        ins = joinRegisters(self.target_label.needed - set(['mem']))
+        ins = joinRegisters(self.target_label.needed & ALL_REGS)
         return ' @ ' + ', '.join(sorted(str(x) for x in ins if not isinstance(x, address.Address)))
 
 class Continue(FlowTerminator):
@@ -134,7 +134,7 @@ class Continue(FlowTerminator):
         return DependencySet(self.target_label.depset.reads, set())
 
     def signature(self):
-        ins = joinRegisters(self.target_label.needed - set(['mem']))
+        ins = joinRegisters(self.target_label.needed & ALL_REGS)
         return ' @ ' + ', '.join(sorted(str(x) for x in ins if not isinstance(x, address.Address)))
 
 class Return(FlowTerminator):

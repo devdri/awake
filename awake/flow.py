@@ -232,7 +232,7 @@ class FlowAnalysis(object):
             childs = self.graph.childs(x)
 
             if (len(self.graph.parents(x)) > 1 or need_label) and x not in self.labels:
-                self.labels[x] = flowcontrol.Label(x)
+                self.labels[x] = flowcontrol.Label(self.graph.block_starts[x])
                 out.append(self.labels[x])
                 need_label = False
 

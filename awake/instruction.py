@@ -320,7 +320,8 @@ class CallInstruction(Instruction):
         if not self.cond.alwaysTrue():
             x = 'CONDITIONAL'
 
-        ins = joinRegisters(self.getDependencySet().reads - set(['mem'])) & joinRegisters(ALL_REGS)
+        depset = self.getDependencySet().onlyRegisters()
+        ins = joinRegisters(depset.reads - set(['mem']))
         outs = joinRegisters(self.returns_used - set(['mem']))
 
         ins |= set(param+'='+str(self.constant_params[param]) for param in self.constant_params)

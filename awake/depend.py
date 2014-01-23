@@ -43,6 +43,9 @@ class DependencySet:
     def __str__(self):
         return 'DependencySet({0}, {1})'.format(joinRegisters(self.reads), joinRegisters(self.writes))
 
+    def onlyRegisters(self):
+        return DependencySet(self.reads & ALL_REGS, self.writes & ALL_REGS)
+
 def encodeDependencySet(depset):
     return ", ".join(str(x) for x in joinRegisters(depset.reads)) + " -> " + ", ".join(str(x) for x in joinRegisters(depset.writes))
 
