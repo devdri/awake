@@ -39,21 +39,21 @@ class ProcedureFlowPage(Page):
 
     def render(self, r):
         with r.lineAddress(self.addr), r.comment():
-                r.hline()
+            r.hline()
 
-                r.startNewLine()
-                r.write("procedure flow ")
-                r.writeSymbol(self.addr, 'procedure')
+            r.startNewLine()
+            r.write("procedure flow ")
+            r.writeSymbol(self.addr, 'procedure')
 
-                r.startNewLine()
-                r.write("  callers: ")
-                r.writeList(ProcAddress(x) for x in sorted(self.info.callers))
+            r.startNewLine()
+            r.write("  callers: ")
+            r.writeList(ProcAddress(x) for x in sorted(self.info.callers))
 
-                r.startNewLine()
-                r.write("  calls: ")
-                r.writeList(ProcAddress(x) for x in sorted(self.proc.calls()))
+            r.startNewLine()
+            r.write("  calls: ")
+            r.writeList(ProcAddress(x) for x in sorted(self.proc.calls()))
 
-                r.hline()
+            r.hline()
 
         with r.indent():
             self.proc.render(r)
@@ -70,21 +70,21 @@ class ProcedureDisasmPage(Page):
     def render(self, r):
 
         with r.lineAddress(self.addr), r.comment():
-                r.hline()
+            r.hline()
 
-                r.startNewLine()
-                r.write("procedure ")
-                r.writeSymbol(self.addr, 'procedure')
+            r.startNewLine()
+            r.write("procedure ")
+            r.writeSymbol(self.addr, 'procedure')
 
-                r.startNewLine()
-                r.write("  callers: ")
-                r.writeList(ProcAddress(x) for x in sorted(self.info.callers))
+            r.startNewLine()
+            r.write("  callers: ")
+            r.writeList(ProcAddress(x) for x in sorted(self.info.callers))
 
-                r.startNewLine()
-                r.write("  calls: ")
-                r.writeList(ProcAddress(x) for x in sorted(self.info.calls))
+            r.startNewLine()
+            r.write("  calls: ")
+            r.writeList(ProcAddress(x) for x in sorted(self.info.calls))
 
-                r.hline()
+            r.hline()
         with r.indent():
             self.proc.render(r, self.proj)
 
@@ -109,21 +109,21 @@ class DataPage(Page):
 
     def render(self, r):
         with r.lineAddress(self.addr), r.comment():
-                r.hline()
+            r.hline()
 
-                r.startNewLine()
-                r.write("data ")
-                r.writeSymbol(self.addr, 'data')
+            r.startNewLine()
+            r.write("data ")
+            r.writeSymbol(self.addr, 'data')
 
-                r.startNewLine()
-                r.write("  reads: ")
-                r.writeList(ProcAddress(x) for x in sorted(self.reads))
+            r.startNewLine()
+            r.write("  reads: ")
+            r.writeList(ProcAddress(x) for x in sorted(self.reads))
 
-                r.startNewLine()
-                r.write("  writes: ")
-                r.writeList(ProcAddress(x) for x in sorted(self.writes))
+            r.startNewLine()
+            r.write("  writes: ")
+            r.writeList(ProcAddress(x) for x in sorted(self.writes))
 
-                r.hline()
+            r.hline()
 
 class SummaryPage(Page):
     def load(self):

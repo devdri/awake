@@ -326,8 +326,8 @@ class CallInstruction(Instruction):
 
         ins |= set(param+'='+str(self.constant_params[param]) for param in self.constant_params)
 
-        ins = ', '.join(ins)
-        outs = ', '.join(outs)
+        ins = ', '.join(sorted(ins))
+        outs = ', '.join(sorted(outs))
         if ins:
             ins = ' @ (' + ins + ')'
         if not outs:

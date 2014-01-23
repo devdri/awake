@@ -96,7 +96,7 @@ def expression(lexer):
         else:
             lexer.push_token(token)
             break
-    while len(stack) > 1 :
+    while len(stack) > 1:
         merge_top()
     return stack[0]
 

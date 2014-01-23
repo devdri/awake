@@ -163,3 +163,6 @@ class Address(object):
 
         else:
             return "(V):{:04X}".format(self.virtual())
+
+    def __repr__(self):
+        return "Address({0})".format(str(self))

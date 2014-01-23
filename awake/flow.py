@@ -24,8 +24,8 @@ from awake.regutil import ALL_REGS
 def select_any(x):
     return next(iter(x), None)
 
-"""Produce a dict of vert->end_points for each fork vert. End points are places, where fork branches merge"""
 def find_merge_points(graph):
+    """Produce a dict of vert->end_points for each fork vert. End points are places, where fork branches merge"""
     queue = set([graph.start()])
     visited = set()
     branches = defaultdict(set)
@@ -90,9 +90,8 @@ def find_merge_points(graph):
 
     return merges
 
-
-"""Produce a dict of vert -> set of cycles, associating each vertex with cycles it lies on"""
 def find_cycles(graph):
+    """Produce a dict of vert -> set of cycles, associating each vertex with cycles it lies on"""
     visited = set()
     stack = []
 
@@ -129,8 +128,8 @@ def find_cycles(graph):
 
     return cycles
 
-"""Find verts that are directly accessible from a vert in cycle, but are not in the cycle"""
 def find_cycle_exits(graph, cycle):
+    """Find verts that are directly accessible from a vert in cycle, but are not in the cycle"""
     out = set()
     cycle = set(cycle)
     for x in cycle:
