@@ -86,7 +86,7 @@ class ProcedureDisasmPage(Page):
 
             r.hline()
         with r.indent():
-            self.proc.render(r, self.proj)
+            self.proc.render(r)
 
 class JumptablePage(Page):
     has_name_form = True

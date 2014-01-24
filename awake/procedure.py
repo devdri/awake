@@ -78,6 +78,7 @@ def manualJumptableLimit(addr):
 class ProcedureRangeAnalysis(object):
 
     def __init__(self, proj, addr, limit):
+        self.proj=proj
         self.start_addr = addr
         self.limit_addr = limit
         self.visited = set()
@@ -214,11 +215,11 @@ class ProcedureRangeAnalysis(object):
         self.block_starts = set(addr for addr in self.block_starts if self.isLocalAddr(addr))
         self.jumptable_sizes = dict((k, v) for (k, v) in self.jumptable_sizes.items() if self.isLocalAddr(k))
 
-    def render(self, renderer, proj):
+    def render(self, renderer):
         for addr in sorted(self.visited):
             if addr in self.labels:
                 renderer.label(addr)
-            proj.disasm.decodeCache(addr)[0].render(renderer)
+            self.proj.disasm.decodeCache(addr)[0].render(renderer)
 
 def getLimit(proj, addr):
     if addr.inPhysicalMem():
