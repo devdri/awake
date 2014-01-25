@@ -17,12 +17,9 @@ def getDB(filename):
         else:
             raise ValueError("Not a rom or database!")
 
-def upgradeDatabase(connection):
-    ver=dbv.detectVersion(connection)
-    for i in xrange(LATEST_VERSION-ver):
-        dbu.upgrade(connection)
-        connection.commit()
-    
+def upgradeDatabase(filename):
+    while dbv.detectVersion(filename)!=LATEST_VERSION:
+        dbu.upgrade(filename)
     
     
 if __name__ == '__main__':
@@ -30,19 +27,14 @@ if __name__ == '__main__':
     
     if args.file:
         filename=getDB(args.file)
-        connection = sqlite3.connect(filename, detect_types=sqlite3.PARSE_DECLTYPES)
-        ver=dbv.detectVersion(connection)
+        ver=dbv.detectVersion(filename)
         print "Database is version",ver
         print "Latest version is",LATEST_VERSION
         if ver!=LATEST_VERSION:
-            connection.close()     #Close the connection, make a backup, and re-connect.
             shutil.copy(filename,filename+".ver"+str(ver)+".bak")
-            connection = sqlite3.connect(filename, detect_types=sqlite3.PARSE_DECLTYPES)
-            upgradeDatabase(connection)
+            upgradeDatabase(filename)
             print "Done!"
         else:
             print "Nothing to do!"
-        connection.commit()
-        connection.close()
     else:
         print "No rom file selected."
