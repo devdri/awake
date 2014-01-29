@@ -396,7 +396,7 @@ class FuncOperator(Operator):
 
     def __eq__(self, other):
         try:
-            return self.name == other.name and self.args == other.args
+            return self.name == other.name and self.childs == other.childs
         except AttributeError:
             return False
 
@@ -411,7 +411,7 @@ class PopValue(FuncOperator):
     name = 'popval'
 
     def getDependencies(self):
-        return FuncOperator.getDependencies(self) | set(['mem'])
+        return FuncOperator.getDependencies(self)# | set(['mem'])
 
     @classmethod
     def make(cls, a):
@@ -423,7 +423,7 @@ class PopStack(FuncOperator):
     name = 'popst'
 
     def getDependencies(self):
-        return FuncOperator.getDependencies(self) | set(['mem'])
+        return FuncOperator.getDependencies(self)# | set(['mem'])
 
     @classmethod
     def make(cls, a):
@@ -436,7 +436,7 @@ class Push(FuncOperator):
     name = 'push'
 
     def getDependencies(self):
-        return FuncOperator.getDependencies(self) | set(['mem'])
+        return FuncOperator.getDependencies(self)# | set(['mem'])
 
 class CarryOfAdd(FuncOperator):
     name = 'c_add'
