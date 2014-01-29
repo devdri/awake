@@ -179,7 +179,8 @@ class ServerFrame(ttk.Frame):
         self.browser_button = ttk.Button(self, text="Open in browser", command=self.openBrowser)
         self.browser_button.grid(row=2, column=1, columnspan=2, sticky='NESW')
         self.enableStartServer()
-
+        if proj.config.get(['Autostart-Server']):
+            self.startServer()
     def enableStartServer(self):
         self.start_button.configure(text="Start server", command=self.startServer)
         self.browser_button.configure(state='disabled')
