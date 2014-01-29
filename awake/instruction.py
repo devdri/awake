@@ -479,7 +479,9 @@ class LoadInstruction(ExpressionOp):
             else:
                 ctx.setValue(target.name, source)
 
-        out.append(LoadInstruction(self.name, target, source, self.addr))
+        if not hasattr(target, 'name') or hash(source) != hash(target):
+            out.append(LoadInstruction(self.name, target, source, self.addr))
+
         return out
 
     def render(self, renderer):

@@ -392,7 +392,7 @@ class FuncOperator(Operator):
         renderer.add(')')
 
     def __hash__(self):
-        return hash((self.name, self.args))
+        return hash((self.name, self.childs))
 
     def __eq__(self, other):
         try:
