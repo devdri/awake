@@ -1,0 +1,6 @@
+{
+"Database": {
+	"Auto-Upgrade": true } ,
+"UI": {
+	"Default-Page": "/proc/150" }
+}
