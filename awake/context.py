@@ -30,7 +30,8 @@ class NameAssigner(object):
         return base + str(num)
 
 def substituteRegister(expression, register, value):
-    ctx = Context(dict(((register, value),)))
+    ctx = Context()
+    ctx.setValue(register, value)
     return expression.optimizedWithContext(ctx)
 
 class Context(object):
