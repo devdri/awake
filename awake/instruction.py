@@ -18,8 +18,9 @@ from awake import address, placeholders
 from awake.depend import DependencySet, unknownDependencySet
 from awake.expression import parse
 from awake.jumptable import JumpTable
-from awake.operand import ComplexValue, ComputedProcAddress, JumpTableAddress, ProcAddress
+from awake.operand import ComplexValue, ComputedProcAddress, JumpTableAddress, ProcAddress, Register
 from awake.regutil import ALL_REGS, joinRegisters, splitRegister, splitRegisters
+from awake.context import substituteRegister
 
 class Instruction(object):
     def __init__(self, name, addr=None):
@@ -450,6 +451,7 @@ class LoadInstruction(ExpressionOp):
     def optimizedWithContext(self, ctx):
         source = self.source.optimizedWithContext(ctx)
         target = self.target
+        out = []
 
         if hasattr(target, 'target'):
             # Dereference target
@@ -466,9 +468,19 @@ class LoadInstruction(ExpressionOp):
 
         if hasattr(target, 'name'):
             # Register target
-            ctx.setValue(target.name, source)
 
-        return LoadInstruction(self.name, target, source, self.addr)
+            if ctx.use_temporary_regs:
+                tmp_name = ctx.substituteWithTemporary(target.name)
+                source = substituteRegister(source, target.name, Register(tmp_name))
+                source = source.optimizedWithContext(ctx)
+                ctx.setValue(target.name, source)
+
+                out.append(LoadInstruction(self.name, Register(tmp_name), Register(target.name), self.addr))
+            else:
+                ctx.setValue(target.name, source)
+
+        out.append(LoadInstruction(self.name, target, source, self.addr))
+        return out
 
     def render(self, renderer):
         renderer.newInstruction(self.addr)

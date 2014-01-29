@@ -302,7 +302,7 @@ class FlowAnalysis(object):
 
     def analyze(self):
 
-        ctx = Context()
+        ctx = Context(use_temporary_regs=True)
 
         if self.addr.virtual() == 0x0A90:
             ctx.setValue('ROMBANK', Constant(1))
@@ -319,6 +319,11 @@ class FlowAnalysis(object):
         content = self.process(self.graph.start(), None, False, False, True)
         content = content.optimizedWithContext(ctx)
         content = content.optimizeDependencies(set(ALL_REGS) - set(['FZ', 'FN', 'FC', 'FH']))
+
+        ctx = Context(use_temporary_regs=False)
+        content = content.optimizedWithContext(ctx)
+        content = content.optimizeDependencies(set(ALL_REGS) - set(['FZ', 'FN', 'FC', 'FH']))
+
         return content
 
 class ProcedureFlow(object):

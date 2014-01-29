@@ -146,6 +146,9 @@ class Register(Operand):
     def __str__(self):
         return self.name
 
+    def __repr__(self):
+        return "Register({0})".format(str(self))
+
     def render(self, renderer):
         renderer.add(str(self), 'register')
 

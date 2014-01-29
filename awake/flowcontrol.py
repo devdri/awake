@@ -151,8 +151,10 @@ class Block(Instruction):
     def __init__(self, contents):
         self.contents = []
         for x in contents:
-            self.contents += x.splitToSimple()
-        #self.contents = contents
+            if isinstance(x, list):
+                self.contents += x
+            else:
+                self.contents += x.splitToSimple()
 
     def __bool__(self):
         return bool(self.contents)
@@ -500,7 +502,8 @@ class While(LoopWhile):
 
     def optimizedWithContext(self, ctx):
         ctx.invalidateAll()
-        inner = self.inner.optimizedWithContext(Context())
+        inner = self.inner.optimizedWithContext(ctx)
+        ctx.invalidateAll()
         return While(inner, self.continue_label)
 
     def getDependencies(self, needed):

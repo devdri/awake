@@ -14,15 +14,36 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from awake.operand import ComplexValue
+from collections import defaultdict
+from awake.operand import ComplexValue, Register
 from awake.operator import HighByte, LowByte, Word, LogicalNot
 
-class Context:
-    def __init__(self, values=None):
+class NameAssigner(object):
+    """Assigns unique temporary variable names"""
+
+    def __init__(self):
+        self.assigned_names = defaultdict(int)
+
+    def assignName(self, base='reg'):
+        num = self.assigned_names[base]
+        self.assigned_names[base] += 1
+        return base + str(num)
+
+def substituteRegister(expression, register, value):
+    ctx = Context(dict(((register, value),)))
+    return expression.optimizedWithContext(ctx)
+
+class Context(object):
+    def __init__(self, values=None, name_assigner=None, use_temporary_regs=False):
         if not values:
             self.values = dict()
         else:
             self.values = dict(values)
+
+        if not name_assigner:
+            name_assigner = NameAssigner()
+        self.name_assigner = name_assigner
+        self.use_temporary_regs = use_temporary_regs
 
     def setValueComplex(self, register):
         if register in ('BC', 'DE', 'HL'):
@@ -51,6 +72,26 @@ class Context:
                 self.setValueComplex(register)
             else:
                 self.values[register] = value
+
+    def setTemporary(self, register, value):
+        name = self.name_assigner.assignName(register)
+        self.setValue(name, value)
+        return name
+
+    def substituteWithTemporary(self, register):
+        if self.hasValue(register):
+            old_value = self.getValue(register)
+        else:
+            old_value = ComplexValue('ctx')
+        tmp_name = self.setTemporary(register, old_value)
+        tmp_value = Register(tmp_name)
+        for key in self.values:
+            if key is tmp_name:
+                continue
+            #if isinstance(self.values[key], Register):
+            #    continue
+            self.values[key] = substituteRegister(self.values[key], register, tmp_value)
+        return tmp_name
 
     def invalidate(self, register):
         delete = set()
@@ -100,4 +141,4 @@ class Context:
                 del self.values[v]
 
     def clone(self):
-        return Context(self.values)
+        return Context(self.values, self.name_assigner, self.use_temporary_regs)
