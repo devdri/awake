@@ -23,6 +23,8 @@ from awake.server import ServerTask
 parser = argparse.ArgumentParser()
 parser.add_argument('rom_file', nargs='?')
 parser.add_argument('start_url', nargs='?')
+parser.add_argument('config_file', nargs='?')
+parser.add_argument('rom_config_file', nargs='?')
 parser.add_argument('--server', action='store_true', default=False)
 
 if __name__ == '__main__':
@@ -30,12 +32,12 @@ if __name__ == '__main__':
 
     if args.server:
         if args.rom_file:
-            proj = Project(args.rom_file)
+            proj = Project(args.rom_file, args.config_file, args.rom_config_file)
             task = ServerTask(proj)
             task.report = print
             task.executeSynchronous()
         else:
             print("Rom file is required for running server\n")
     else:
-        app = MainWindow(None, args.rom_file, args.start_url)
+        app = MainWindow(None, args.rom_file, args.start_url, args.config_file, args.rom_config_file)
         app.mainloop()
