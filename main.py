@@ -39,5 +39,5 @@ if __name__ == '__main__':
         else:
             print("Rom file is required for running server\n")
     else:
-        app = MainWindow(None, "roms/blue.gb", args.start_url, args.config_file, args.rom_config_file)
+        app = MainWindow(None, args.rom_file, args.start_url, args.config_file, args.rom_config_file)
         app.mainloop()
