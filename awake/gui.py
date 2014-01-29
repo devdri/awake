@@ -38,7 +38,7 @@ style = {
 
 class MainWindow(tk.Toplevel):
 
-    def __init__(self, parent=None, filename=None, url=None):
+    def __init__(self, parent=None, filename=None, url=None, config_file=None, rom_config_file=None):
         if not parent:
             parent = getTkRoot()
         tk.Toplevel.__init__(self, parent)
@@ -50,7 +50,9 @@ class MainWindow(tk.Toplevel):
         self.title(title)
 
         if filename:
-            self.proj = Project(filename)
+            self.proj = Project(filename, config_file, rom_config_file)
+            if self.proj.config.get(['Autostart-Server']):
+                self.showServer()
         else:
             self.proj = None
 
@@ -102,7 +104,7 @@ class MainWindow(tk.Toplevel):
         self.protocol("WM_DELETE_WINDOW", self.quit)
 
         if not url and self.proj:
-            url = '/proc/150'
+            url = self.proj.romconfig.get(['UI','Default-Page'])
 
         if url:
             self.history.navigate(url)
