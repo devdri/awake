@@ -64,4 +64,4 @@ def detectVersion(filename):
             return versionid                                #return the version number.
     c.close()
     conn.close()
-    raise ValueError("Could not detect database version!")
+    return 0

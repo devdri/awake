@@ -17,28 +17,26 @@ def getDB(filename):
     else:
         raise ValueError("Not a rom or database!")
 
-def upgradeDatabase(connection):
-    ver=dbv.detectVersion(connection)
+def upgradeDatabase(name):
+    ver=dbv.detectVersion(name)
     for i in xrange(LATEST_VERSION-ver):
-        dbu.upgrade(connection)
-        connection.commit()
+        dbu.upgrade(name)
     
 def doUpgrade(name):
     filename=getDB(name)
-    connection = sqlite3.connect(filename, detect_types=sqlite3.PARSE_DECLTYPES)
-    ver=dbv.detectVersion(connection)
+    ver=dbv.detectVersion(filename)
+    if ver==0:
+        print "Unknown database version!"
+        print "Skipping upgrade check."
+        return
     print "Database is version",ver
     print "Latest version is",LATEST_VERSION
     if ver!=LATEST_VERSION:
-        connection.close()     #Close the connection, make a backup, and re-connect.
         shutil.copy(filename,filename+".ver"+str(ver)+".bak")
-        connection = sqlite3.connect(filename, detect_types=sqlite3.PARSE_DECLTYPES)
-        upgradeDatabase(connection)
+        upgradeDatabase(filename)
         print "Done!"
     else:
         print "Nothing to do!"
-    connection.commit()
-    connection.close()
     
 if __name__ == '__main__':
     args = parser.parse_args()

@@ -18,6 +18,7 @@ import os.path
 import Tkinter as tk
 import ttk
 from tkFileDialog import askopenfilename
+from awake.config import Config
 from awake.export import ExportDialog
 from awake.project import Project
 from awake.pages import dispatchUrl
@@ -38,7 +39,7 @@ style = {
 
 class MainWindow(tk.Toplevel):
 
-    def __init__(self, parent=None, filename=None, url=None, config_file=None, rom_config_file=None):
+    def __init__(self, parent=None, filename=None, url=None, config_file=None):
         if not parent:
             parent = getTkRoot()
         tk.Toplevel.__init__(self, parent)
@@ -50,7 +51,8 @@ class MainWindow(tk.Toplevel):
         self.title(title)
 
         if filename:
-            self.proj = Project(filename, config_file, rom_config_file)
+            self.romconfig=Config(filename, rom=True)
+            self.proj = Project(filename, config_file)
             if self.proj.config.get(['Autostart-Server']):
                 self.showServer()
         else:
@@ -104,7 +106,7 @@ class MainWindow(tk.Toplevel):
         self.protocol("WM_DELETE_WINDOW", self.quit)
 
         if not url and self.proj:
-            url = self.proj.romconfig.get(['UI','Default-Page'])
+            url = self.romconfig.get(['UI','Default-Page'])
 
         if url:
             self.history.navigate(url)
